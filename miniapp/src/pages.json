@@ -1,0 +1,39 @@
+{
+  "pages": [
+    { "path": "pages/index/index", "style": { "navigationBarTitleText": "拾家有方", "navigationStyle": "custom", "enablePullDownRefresh": true } },
+    { "path": "pages/category/category", "style": { "navigationBarTitleText": "服务分类", "navigationStyle": "custom", "enablePullDownRefresh": true } },
+    { "path": "pages/detail/detail", "style": { "navigationBarTitleText": "服务详情", "navigationStyle": "custom" } },
+    { "path": "pages/confirm/confirm", "style": { "navigationBarTitleText": "确认订单", "navigationStyle": "custom" } },
+    { "path": "pages/pay-success/pay-success", "style": { "navigationBarTitleText": "支付成功", "navigationStyle": "custom" } },
+    { "path": "pages/order/order", "style": { "navigationBarTitleText": "我的订单", "navigationStyle": "custom" } },
+    { "path": "pages/order-detail/order-detail", "style": { "navigationBarTitleText": "订单详情", "navigationStyle": "custom" } },
+    { "path": "pages/review/review", "style": { "navigationBarTitleText": "评价", "navigationStyle": "custom" } },
+    { "path": "pages/mine/mine", "style": { "navigationBarTitleText": "个人中心", "navigationStyle": "custom" } },
+    { "path": "pages/address/address", "style": { "navigationBarTitleText": "地址管理", "navigationStyle": "custom" } },
+    { "path": "pages/address/edit", "style": { "navigationBarTitleText": "编辑地址", "navigationStyle": "custom" } },
+    { "path": "pages/coupon/coupon", "style": { "navigationBarTitleText": "我的优惠券", "navigationStyle": "custom" } },
+    { "path": "pages/leader/workbench", "style": { "navigationBarTitleText": "领队工作台", "navigationStyle": "custom" } },
+    { "path": "pages/leader/order", "style": { "navigationBarTitleText": "订单详情", "navigationStyle": "custom" } },
+    { "path": "pages/leader/photo", "style": { "navigationBarTitleText": "现场照片", "navigationStyle": "custom" } },
+    { "path": "pages/leader/acceptance", "style": { "navigationBarTitleText": "提交验收", "navigationStyle": "custom" } },
+    { "path": "pages/login/login", "style": { "navigationBarTitleText": "登录", "navigationStyle": "custom" } }
+  ],
+  "tabBar": {
+    "color": "#9a8b79",
+    "selectedColor": "#2b2118",
+    "backgroundColor": "#fffdf8",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/category/category", "text": "分类" },
+      { "pagePath": "pages/order/order", "text": "订单" },
+      { "pagePath": "pages/mine/mine", "text": "我的" }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarBackgroundColor": "#fffdf8",
+    "navigationBarTitleText": "拾家有方",
+    "backgroundColor": "#fff9f0"
+  }
+}

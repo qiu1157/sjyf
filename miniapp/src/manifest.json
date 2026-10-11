@@ -1,0 +1,30 @@
+{
+  "name": "拾家有方",
+  "appid": "",
+  "description": "拾家有方家政服务",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "app-plus": {},
+  "h5": {
+    "title": "拾家有方",
+    "devServer": {
+      "port": 5174,
+      "proxy": {
+        "/api": {
+          "target": "http://localhost:3000",
+          "changeOrigin": true
+        },
+        "/uploads": {
+          "target": "http://localhost:3000",
+          "changeOrigin": true
+        }
+      }
+    }
+  },
+  "mp-weixin": {
+    "appid": "",
+    "setting": { "urlCheck": false, "es6": true, "minified": true }
+  },
+  "vueVersion": "3"
+}

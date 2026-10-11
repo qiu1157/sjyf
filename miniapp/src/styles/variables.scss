@@ -1,0 +1,148 @@
+// ==========================================
+// 拾家有方 - 设计系统变量
+// ==========================================
+
+// 颜色系统
+// ------------------------------------------
+// 语义化品牌色
+$color-primary: #B76E45;          // 主品牌色 - 暖棕
+$color-primary-dark: #9E5B37;     // 深色 - 按钮
+$color-primary-light: #CB8750;    // 浅色
+
+// 中性色令牌
+$neutral-0: #FFFFFF;
+$neutral-50: #FAF7F2;
+$neutral-100: #F3EDE3;
+$neutral-200: #E7DECF;
+$neutral-500: #978468;
+$neutral-700: #5C4E3B;
+$neutral-800: #3E3427;
+$neutral-900: #201A13;
+
+// 状态色令牌
+$state-success: #5B8C5A;
+$state-warning: #D99A3D;
+$state-error: #C25450;
+$state-info: #5A84A8;
+
+// 语义化表面与文字
+$surface-page: $neutral-50;
+$surface-card: $neutral-0;
+$surface-overlay: rgba(255, 253, 248, 0.95);
+$text-primary: $neutral-900;
+$text-body: $neutral-700;
+$text-secondary: $neutral-500;
+$text-tertiary: $neutral-500;
+$border-default: $neutral-200;
+$overlay-mask: rgba(32, 26, 19, 0.42);
+
+// 兼容旧变量命名，逐步迁移页面时继续复用
+$color-dark: $text-primary;
+$color-darker: $text-primary;
+$bg-cream: $surface-page;
+$bg-paper: $surface-card;
+$bg-grey: #F7F4EE;
+$bg-sand: #EAD8BD;
+$bg-sand2: #F4E5D0;
+$text-dark: $text-primary;
+$text-muted: $text-secondary;
+$text-light: #9A8B79;
+$line-color: $border-default;
+$line-light: #F0E7DA;
+$color-green: $state-success;
+$color-orange: $state-warning;
+$color-red: $state-error;
+$color-yellow: #D9A441;
+$color-white: $neutral-0;
+$color-success-strong: #389E0D;
+$color-success-bright: #52C41A;
+$color-success-deep: #1F8F55;
+$color-warning-deep: #D46B08;
+$color-warning-strong: #D96B16;
+$color-danger-bright: #F5222D;
+
+// 扩展背景与描边
+$bg-paper-soft: #fffaf5;          // 柔和卡片背景
+$bg-warning-soft: #fff3e6;        // 提醒浅背景
+$bg-warning-ghost: #fff3e8;       // 提醒幽灵背景
+$bg-primary-soft: #efe2d5;        // 主色浅背景
+$bg-primary-ghost: #f7efe4;       // 主色幽灵背景
+$bg-success-soft: #e8f7ec;        // 成功浅背景
+$bg-neutral-soft: #f2f2f2;        // 中性浅背景
+$bg-tag-orange: #fff2df;          // 橙色标签背景
+$bg-tag-green: #eaf7ec;           // 绿色标签背景
+$bg-tag-red: #fae9e5;             // 红色标签背景
+$bg-tag-brown: #f1e1ce;           // 棕色标签背景
+$bg-sand-light: #fff3df;          // 浅沙色
+$bg-sand-strong: #e8d2b5;         // 深沙色
+$bg-paper-highlight: #fff4e2;     // 高亮奶白
+$bg-paper-overlay: $surface-overlay; // 底栏半透明背景
+$line-warm: #eadcc9;              // 时间线暖色描边
+$line-dashed-warm: #cfb28e;       // 虚线描边
+
+// 扩展文字色
+$text-white-soft: #f5e8d4;        // Hero 浅色文案
+$text-warning: #8c6b55;           // 暖提醒文字
+$text-neutral-strong: #333;       // 强中性色文字
+$text-neutral-secondary: #666;    // 次中性色文字
+
+// 遮罩
+$overlay-white-soft: rgba(255, 255, 255, 0.18);
+$overlay-white-50: rgba(255, 255, 255, 0.5);
+$overlay-primary-soft: rgba($color-primary, 0.2);
+$overlay-dark-42: $overlay-mask;
+$overlay-dark-70: rgba(52, 40, 32, 0.7);
+$overlay-card-soft: rgba(73, 48, 28, 0.08);
+
+// 渐变
+$gradient-hero: linear-gradient(135deg, #3a2a1c, #c9a574);  // 首屏渐变
+$gradient-card: linear-gradient(135deg, #fff, #f4e5d0);     // 卡片渐变
+$gradient-btn: linear-gradient(135deg, #2b2118, $color-primary);   // 按钮渐变
+
+// 间距系统
+// ------------------------------------------
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 12px;
+$spacing-base: 16px;
+$spacing-lg: 20px;
+$spacing-xl: 24px;
+$spacing-2xl: 32px;
+
+// 圆角系统
+// ------------------------------------------
+$radius-sm: 12px;
+$radius-md: 16px;
+$radius-lg: 20px;
+$radius-xl: 24px;
+$radius-2xl: 34px;
+$radius-round: 999px;             // 胶囊圆角
+
+// 阴影系统
+// ------------------------------------------
+$shadow-soft: 0 12px 34px rgba(73,48,28,.10);   // 柔和大阴影
+$shadow-card: 0 6px 16px rgba(73,48,28,.07);    // 卡片阴影
+$shadow-light: 0 4px 12px rgba(73,48,28,.05);   // 轻微阴影
+
+// 字体系统
+// ------------------------------------------
+$font-size-xs: 12px;
+$font-size-sm: 13px;
+$font-size-base: 14px;
+$font-size-lg: 16px;
+$font-size-xl: 18px;
+$font-size-2xl: 22px;
+$font-size-3xl: 26px;
+$font-size-4xl: 44px;
+
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-bold: 700;
+$font-weight-black: 900;
+
+// z-index
+// ------------------------------------------
+$z-normal: 1;
+$z-card: 10;
+$z-fixed: 100;
+$z-modal: 1000;

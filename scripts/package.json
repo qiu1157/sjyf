@@ -1,0 +1,12 @@
+{
+  "name": "shijia-import-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "拾家有方订单数据导入工具集（模板生成等）",
+  "scripts": {
+    "gen:order-template": "node gen-order-template.cjs"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  }
+}

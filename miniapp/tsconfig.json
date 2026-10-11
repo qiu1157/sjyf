@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "lib": ["DOM", "ES2017"],
+    "types": ["@dcloudio/types"],
+    "strict": false,
+    "jsx": "preserve",
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"]
+}

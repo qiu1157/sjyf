@@ -1,0 +1,85 @@
+# ============================================================
+# 依赖与构建产物
+# ============================================================
+node_modules/
+dist/
+build/
+dist-release/
+.turbo/
+.cache/
+coverage/
+*.tsbuildinfo
+
+# 部署打包临时目录
+.deploy-release/
+
+# 临时测试脚本
+test-us-*.js
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 运行时数据
+backend/*.db
+backend/*.db-*
+backend/*.db.bak
+backend/*.sqlite
+backend/*.sqlite3
+backend/uploads/
+miniapp/project.private.config.json
+
+# 本地 IDE 与系统文件
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ============================================================
+# 环境与服务器配置文件（不提交）
+# ============================================================
+.env
+.env.*
+backend/.env*
+
+# PM2 进程配置
+backend/ecosystem.config.*
+
+# Nginx 配置（deploy/ 整个目录已在下方排除）
+
+# ============================================================
+# 文档（不提交）
+# ============================================================
+# 所有 Markdown 文档
+*.md
+
+# PDF / Zip / Excel 等文档
+*.pdf
+*.zip
+*.xlsx
+
+# 设计稿源文件
+*.design
+
+# 根目录下的原型 HTML（保留 admin/index.html 与 miniapp/index.html 项目入口）
+/*.html
+
+# 需求/设计/Spec 文档目录
+/.trae/
+/deploy/
+
+# ============================================================
+# 设计原型与素材（不提交）
+# ============================================================
+shijia-prd/
+shijia-service-content-admin/
+shijia-service-content-m/
+shijia-service-covers/
+shijia-category-icons/
+海报素材/
+
+# 项目截图
+admin/admin_dashboard.png
