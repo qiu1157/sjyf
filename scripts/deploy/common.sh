@@ -93,7 +93,8 @@ replace_dir_contents() {
   local target_dir="$2"
 
   ensure_dir "$target_dir"
-  find "$target_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+  # 清理目标目录，但保留宝塔面板创建的 .user.ini（不可变属性，rm 会失败）
+  find "$target_dir" -mindepth 1 -maxdepth 1 ! -name '.user.ini' -exec rm -rf {} +
   cp -R "$source_dir"/. "$target_dir"/
 }
 
