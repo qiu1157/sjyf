@@ -19,7 +19,7 @@ function resolveLanHost() {
 // 环境变量 MINIAPP_API_ORIGIN 始终拥有最高优先级，可覆盖上述两种场景
 const isProd = process.env.NODE_ENV === 'production';
 const miniappApiOrigin = process.env.MINIAPP_API_ORIGIN
-  || (isProd ? 'https://sjyf.solo1157.xyz:3000' : `http://${resolveLanHost()}:3000`);
+  || (isProd ? 'https://sjyf.solo1157.xyz' : `http://${resolveLanHost()}:3000`);
 
 export default defineConfig({
   plugins: [uni()],
