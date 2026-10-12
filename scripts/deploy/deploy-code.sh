@@ -6,6 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./common.sh
 source "$SCRIPT_DIR/common.sh"
 
+# 确保使用 Node.js v20+
+setup_node_path
+
 BRANCH="${1:-$DEFAULT_BRANCH}"
 SOURCE_BACKEND_DIR="$SOURCE_DIR/backend"
 SOURCE_ADMIN_DIR="$SOURCE_DIR/admin"
