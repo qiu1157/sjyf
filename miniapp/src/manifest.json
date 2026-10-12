@@ -24,7 +24,8 @@
   },
   "mp-weixin": {
     "appid": "",
-    "setting": { "urlCheck": false, "es6": true, "minified": true }
+    "setting": { "urlCheck": false, "es6": true, "minified": true },
+    "lazyCodeLoading": "requiredComponents"
   },
   "vueVersion": "3"
 }

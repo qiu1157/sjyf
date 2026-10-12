@@ -4,15 +4,15 @@
   "private": true,
   "description": "拾家有方 - 根聚合入口（统一 build / 打包 / 本地验证）",
   "scripts": {
-    "build:backend": "cd backend && npm run build",
-    "build:admin": "cd admin && npm run build",
-    "build:miniapp": "cd miniapp && npm run build:h5",
+    "build:backend": "cd code/backend && npm run build",
+    "build:admin": "cd code/admin && npm run build",
+    "build:miniapp": "cd code/miniapp && npm run build:h5",
     "build:all": "npm run build:backend && npm run build:admin && npm run build:miniapp",
-    "package:backend": "node scripts/package-release.cjs --backend-only",
-    "package:admin": "node scripts/package-release.cjs --admin-only",
-    "package:miniapp": "node scripts/package-release.cjs --miniapp-only",
-    "package:all": "node scripts/package-release.cjs",
-    "deploy:local": "node scripts/deploy-local.mjs"
+    "package:backend": "node code/scripts/package-release.cjs --backend-only",
+    "package:admin": "node code/scripts/package-release.cjs --admin-only",
+    "package:miniapp": "node code/scripts/package-release.cjs --miniapp-only",
+    "package:all": "node code/scripts/package-release.cjs",
+    "deploy:local": "node code/scripts/deploy-local.mjs"
   },
   "devDependencies": {
     "archiver": "^7.0.1",
