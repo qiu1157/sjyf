@@ -34,7 +34,6 @@ require_cmd git
 require_cmd npm
 require_cmd pm2
 require_cmd nginx
-require_cmd systemctl
 
 [[ -d "$SOURCE_DIR/.git" ]] || die "未找到源码目录 $SOURCE_DIR，请先执行 init-server.sh"
 
@@ -114,7 +113,14 @@ replace_dir_contents "$SOURCE_MINIAPP_DIR/dist/build/h5" "$MINIAPP_H5_DIR/dist/b
 
 log_info "校验并重载 Nginx..."
 nginx -t
-systemctl reload nginx
+# 兼容宝塔面板（/etc/init.d/nginx）和 systemd 两种管理方式
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
+  systemctl reload nginx
+elif [[ -x /etc/init.d/nginx ]]; then
+  /etc/init.d/nginx reload
+else
+  nginx -s reload
+fi
 
 log_info "重启后端进程..."
 pm2 restart "$BACKEND_PM2_NAME" --update-env
