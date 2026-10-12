@@ -88,16 +88,7 @@ admin/admin_dashboard.png
 # 本地目录整理（code/ 通过 Junction 访问，docs/ 本地文档）
 # ============================================================
 /code/
-
-# docs 目录仅纳入部署相关文档，其余（设计、需求、归档等）不提交
-/docs/*
-!/docs/deploy/
-
-# 例外：部署文档和配置需纳入版本管理
-!/docs/deploy/**/*.md
-!/docs/deploy/**/*.conf
-!/docs/deploy/**/*.ini
-!/docs/deploy/**/*.sh
+/docs/
 
 # 本地临时目录
 .uploads/
