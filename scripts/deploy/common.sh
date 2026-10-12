@@ -2,19 +2,20 @@
 
 set -euo pipefail
 
-APP_ROOT="${APP_ROOT:-/srv/shijia}"
+APP_ROOT="${APP_ROOT:-/www/wwwroot/shijia}"
 SOURCE_DIR="${SOURCE_DIR:-$APP_ROOT/app}"
 BACKEND_DIR="${BACKEND_DIR:-$APP_ROOT/backend}"
-ADMIN_DIR="${ADMIN_DIR:-$APP_ROOT/admin}"
-MINIAPP_H5_DIR="${MINIAPP_H5_DIR:-$APP_ROOT/miniapp-h5}"
-UPLOADS_DIR="${UPLOADS_DIR:-$APP_ROOT/uploads}"
-LOG_DIR="${LOG_DIR:-$APP_ROOT/logs}"
+ADMIN_DIR="${ADMIN_DIR:-$APP_ROOT/sites/admin}"
+MINIAPP_H5_DIR="${MINIAPP_H5_DIR:-$APP_ROOT/sites/h5}"
+UPLOADS_DIR="${UPLOADS_DIR:-$APP_ROOT/data/uploads}"
+LOG_DIR="${LOG_DIR:-$APP_ROOT/backend/logs}"
 BACKUP_DIR="${BACKUP_DIR:-$APP_ROOT/backup}"
 
 REPO_URL="${REPO_URL:-git@github.com:qiu1157/sjyf.git}"
 DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
 BACKEND_PM2_NAME="${BACKEND_PM2_NAME:-sjyf-backend}"
-NGINX_CONF_TARGET="${NGINX_CONF_TARGET:-/etc/nginx/conf.d/shijia.conf}"
+# 宝塔面板 Nginx 站点配置目录
+NGINX_CONF_TARGET="${NGINX_CONF_TARGET:-/www/server/panel/vhost/nginx/0.default.conf}"
 
 timestamp() {
   date +"%Y-%m-%d %H:%M:%S"

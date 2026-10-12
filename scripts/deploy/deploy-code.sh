@@ -10,7 +10,6 @@ BRANCH="${1:-$DEFAULT_BRANCH}"
 SOURCE_BACKEND_DIR="$SOURCE_DIR/backend"
 SOURCE_ADMIN_DIR="$SOURCE_DIR/admin"
 SOURCE_MINIAPP_DIR="$SOURCE_DIR/miniapp"
-SOURCE_NGINX_CONF="$SOURCE_DIR/deploy/nginx.shijia.conf"
 
 usage() {
   cat <<EOF
@@ -107,14 +106,8 @@ log_info "构建小程序 H5..."
 )
 
 log_info "同步 H5 静态产物..."
-replace_dir_contents "$SOURCE_MINIAPP_DIR/dist/build/h5" "$MINIAPP_H5_DIR/dist"
-
-if [[ -f "$SOURCE_NGINX_CONF" ]]; then
-  log_info "同步 Nginx 配置..."
-  copy_file "$SOURCE_NGINX_CONF" "$NGINX_CONF_TARGET"
-else
-  log_warn "未找到 $SOURCE_NGINX_CONF，保留服务器现有 Nginx 配置不变。"
-fi
+# nginx root 指向 sites/h5/dist/build/h5，需保持相同目录结构
+replace_dir_contents "$SOURCE_MINIAPP_DIR/dist/build/h5" "$MINIAPP_H5_DIR/dist/build/h5"
 
 log_info "校验并重载 Nginx..."
 nginx -t
