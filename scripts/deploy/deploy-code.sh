@@ -38,6 +38,8 @@ require_cmd nginx
 [[ -d "$SOURCE_DIR/.git" ]] || die "未找到源码目录 $SOURCE_DIR，请先执行 init-server.sh"
 
 log_info "拉取 GitHub 最新代码..."
+# 清理 npm install 产生的本地修改（如 package-lock.json），确保 pull 不冲突
+git -C "$SOURCE_DIR" checkout -- . 2>/dev/null || true
 git -C "$SOURCE_DIR" fetch --all --prune
 git -C "$SOURCE_DIR" checkout "$BRANCH"
 git -C "$SOURCE_DIR" pull --ff-only origin "$BRANCH"
