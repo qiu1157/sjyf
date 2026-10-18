@@ -4,6 +4,12 @@ import { Repository, FindOptionsWhere } from 'typeorm';
 import { ServiceCategory } from '../../entities/service-category.entity';
 import { ServiceItem } from '../../entities/service-item.entity';
 import { OperationLogHelper, OperatorInfo } from '../../common/utils/operation-log.helper';
+import {
+  normalizeBlocks,
+  renderBlocksToHtml,
+  parseStoredBlocks,
+  summarizeBlocks,
+} from './content-blocks.util';
 
 @Injectable()
 export class ServiceService {
@@ -27,6 +33,22 @@ export class ServiceService {
       if (typeof cleaned[f] === 'string') cleaned[f] = (cleaned[f] as string).trim();
     }
     return cleaned as T;
+  }
+
+  /**
+   * 块式详情双写：校验块数据 → 写入 JSON 真身（content_blocks）+ 生成 HTML 快照（content）
+   * 未传 / null / 空字符串时视为「本次不动」，移除该字段以保留旧的快照内容；
+   * 空数组等非法结构由 normalizeBlocks 直接抛错
+   */
+  private applyContentBlocks(data: Partial<ServiceItem>): boolean {
+    const payload = normalizeBlocks((data as any).content_blocks);
+    if (!payload) {
+      delete (data as any).content_blocks;
+      return false;
+    }
+    data.content_blocks = JSON.stringify(payload);
+    data.content = renderBlocksToHtml(payload);
+    return true;
   }
 
   async createCategory(data: Partial<ServiceCategory>, operator?: OperatorInfo) {
@@ -154,7 +176,8 @@ export class ServiceService {
   async getItem(id: number) {
     const item = await this.itemRepo.findOne({ where: { id, is_deleted: 0 } });
     if (!item) throw new NotFoundException('服务不存在');
-    return item;
+    // 后台编辑接口：把 content_blocks 字符串解析为对象供编辑器回填（脏数据置 null，不抛错）
+    return { ...item, content_blocks: parseStoredBlocks(item.content_blocks) };
   }
 
   // 小程序端公开详情：下架/删除返回特定提示
@@ -162,7 +185,10 @@ export class ServiceService {
     const item = await this.itemRepo.findOne({ where: { id } });
     if (!item || item.is_deleted === 1) throw new NotFoundException('服务不存在或已删除');
     if (item.status === 0) throw new NotFoundException('该服务已下架');
-    return item;
+    // 公开接口不暴露内部编辑数据 content_blocks，只返回 content 快照
+    const result: Record<string, any> = { ...item };
+    delete result.content_blocks;
+    return result;
   }
 
   // 小程序端公开专区接口：按 display_zone 查上架服务列表
@@ -176,6 +202,8 @@ export class ServiceService {
   async createItem(data: Partial<ServiceItem>, operator?: OperatorInfo) {
     // 去除字符串字段左右空格（在唯一性校验之前执行）
     data = this.trimStringFields(data as any, ['name', 'cover_image', 'thumbnail_image', 'banner_image', 'description', 'content', 'scope', 'notice']);
+    // 块式详情：校验后双写 content_blocks（JSON 真身）与 content（HTML 快照）
+    this.applyContentBlocks(data);
     // 走马灯大图校验：展示专区选「走马灯海报」(1) 时 banner_image 必填
     if (data.display_zone === 1 && !data.banner_image) {
       throw new BadRequestException('展示专区为走马灯海报时，必须上传走马灯大图');
@@ -186,13 +214,13 @@ export class ServiceService {
       if (exist) throw new BadRequestException('服务标题已存在，请使用其他标题');
     }
     const item = await this.itemRepo.save(this.itemRepo.create(data));
-    // 写入操作日志
+    // 写入操作日志（详情只记录块摘要，不记录全文）
     await this.logHelper.write({
       operator: operator || {},
       module: 'service_item',
       action: 'create',
       targetId: item.id,
-      content: JSON.stringify({ name: item.name, category_id: item.category_id, price: item.price, promo_price: item.promo_price }),
+      content: JSON.stringify({ name: item.name, category_id: item.category_id, price: item.price, promo_price: item.promo_price, content: summarizeBlocks(item.content_blocks) }),
     });
     return item;
   }
@@ -200,6 +228,8 @@ export class ServiceService {
   async updateItem(id: number, data: Partial<ServiceItem>, operator?: OperatorInfo) {
     // 去除字符串字段左右空格（在唯一性校验之前执行）
     data = this.trimStringFields(data as any, ['name', 'cover_image', 'thumbnail_image', 'banner_image', 'description', 'content', 'scope', 'notice']);
+    // 块式详情：传了块数据则双写；未传 / null / 空数组视为本次不动，保留旧 content 快照
+    this.applyContentBlocks(data);
     const before = await this.itemRepo.findOne({ where: { id, is_deleted: 0 } });
     if (!before) throw new NotFoundException('服务不存在');
     // 走马灯大图校验：展示专区选「走马灯海报」(1) 时 banner_image 必填（合并已有值判断）
@@ -215,15 +245,15 @@ export class ServiceService {
     }
     await this.itemRepo.update(id, data);
     const after = await this.itemRepo.findOne({ where: { id, is_deleted: 0 } });
-    // 写入操作日志，记录关键字段变化
+    // 写入操作日志，记录关键字段变化（详情只记录块摘要，不记录全文）
     await this.logHelper.write({
       operator: operator || {},
       module: 'service_item',
       action: 'update',
       targetId: id,
       content: JSON.stringify({
-        before: { name: before.name, price: before.price, promo_price: before.promo_price, status: before.status, display_zone: before.display_zone },
-        after: { name: after?.name, price: after?.price, promo_price: after?.promo_price, status: after?.status, display_zone: after?.display_zone },
+        before: { name: before.name, price: before.price, promo_price: before.promo_price, status: before.status, display_zone: before.display_zone, content: summarizeBlocks(before.content_blocks) },
+        after: { name: after?.name, price: after?.price, promo_price: after?.promo_price, status: after?.status, display_zone: after?.display_zone, content: summarizeBlocks(after?.content_blocks) },
       }),
     });
     return after;

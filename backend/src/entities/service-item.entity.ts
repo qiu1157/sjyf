@@ -16,7 +16,10 @@ export class ServiceItem {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true }) promo_price: number;
   @Column({ type: 'int', default: 60 }) duration: number;
   @Column({ type: 'text', nullable: true }) description: string;
+  // 详情 HTML 快照（服务端由 content_blocks 生成，小程序渲染用；历史纯文本值保留）
   @Column({ type: 'text', nullable: true }) content: string;
+  // 块式详情结构化数据（JSON 字符串），形如 {"version":1,"blocks":[...]}
+  @Column({ type: 'text', nullable: true }) content_blocks: string;
   @Column({ length: 512, nullable: true }) scope: string;
   @Column({ length: 512, nullable: true }) notice: string;
   @Column({ type: 'int', default: 0 }) sort: number;

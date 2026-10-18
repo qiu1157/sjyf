@@ -9,12 +9,13 @@ const UPLOAD_PATHS: Record<string, string> = {
   'category-icon': '/admin/upload/category-icon',
   'service-image': '/admin/upload/service-image',
   'banner-image': '/admin/upload/banner-image',
+  'content-image': '/admin/upload/content-image',
 };
 
 interface ImageUploadProps {
   value?: string;
   onChange?: (value: string) => void;
-  type?: 'category-icon' | 'service-image' | 'banner-image';
+  type?: 'category-icon' | 'service-image' | 'banner-image' | 'content-image';
   hint?: string;
 }
 

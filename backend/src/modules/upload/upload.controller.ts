@@ -55,6 +55,21 @@ export class UploadController {
     return this.uploadService.handleUpload('banner-image', file);
   }
 
+  // 内容块图片上传（详情图文编排）：系统管理员与主管可访问，归属内容管理菜单
+  @Roles(1, 3)
+  @Menu('services')
+  @Post('admin/upload/content-image')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: '上传内容块图片' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } },
+  })
+  async uploadContentImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('请选择要上传的文件');
+    return this.uploadService.handleUpload('content-image', file);
+  }
+
   // 领队现场照片上传：领队可访问
   @Roles(4)
   @Post('leader/upload/photo')

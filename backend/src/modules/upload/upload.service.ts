@@ -22,6 +22,8 @@ const CONFIGS: Record<string, UploadConfig> = {
   'category-icon': { subdir: 'categories', thumbSize: 80, maxSize: 500 * 1024, generateThumb: true },
   'service-image': { subdir: 'services', thumbSize: 200, maxSize: 2 * 1024 * 1024, generateThumb: true },
   'banner-image': { subdir: 'services', thumbSize: 0, maxSize: 2 * 1024 * 1024, generateThumb: false },
+  // 内容块图片：详情图文编排用，不生成缩略图（快照直接引用原图）
+  'content-image': { subdir: 'services', thumbSize: 0, maxSize: 2 * 1024 * 1024, generateThumb: false },
   'leader-photo': { subdir: 'order-photos', thumbSize: 0, maxSize: 5 * 1024 * 1024, generateThumb: false },
 };
 
