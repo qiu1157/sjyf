@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import request from '../utils/request';
 import { colors } from '../theme';
 import ImageUpload from '../components/ImageUpload';
+import ServiceContentEditor from '../components/ServiceContentEditor';
 
 export default function Services() {
   const [data, setData] = useState<any>({ list: [], total: 0 });
@@ -34,7 +35,13 @@ export default function Services() {
   };
 
   const submit = async () => {
-    const v = await form.validateFields();
+    // 校验失败由表单内联提示展示；此处吞掉 validateFields 的 reject，避免未捕获的 Promise 拒绝
+    let v: any;
+    try {
+      v = await form.validateFields();
+    } catch {
+      return;
+    }
     if (editing) await request.put(`/admin/services/${editing.id}`, v);
     else {
       await request.post('/admin/services', v);
@@ -188,7 +195,7 @@ export default function Services() {
           pageSizeOptions: [10, 20, 50, 100],
         }}
       />
-      <Modal title={editing ? '编辑服务' : '新增服务'} open={modal} onCancel={() => setModal(false)} onOk={submit} width={720} destroyOnClose>
+      <Modal title={editing ? '编辑服务' : '新增服务'} open={modal} onCancel={() => setModal(false)} onOk={submit} width={1100} destroyOnClose>
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="服务标题" rules={[
             { required: true, message: '请输入服务标题' },
@@ -265,8 +272,21 @@ export default function Services() {
             <Input.TextArea rows={2} placeholder="1-500 字符" showCount maxLength={500} />
           </Form.Item>
 
-          <Form.Item name="content" label="详情说明" rules={[{ required: true, message: '请输入详情' }]}>
-            <Input.TextArea rows={4} placeholder="服务详细说明" />
+          <Form.Item
+            name="content_blocks"
+            label="详情说明"
+            rules={[
+              { required: true, message: '请至少添加一个内容块' },
+              {
+                // 空块数组是合法对象，required 拦不住，需显式校验
+                validator: (_, val) =>
+                  val && Array.isArray(val.blocks) && val.blocks.length > 0
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('请至少添加一个内容块')),
+              },
+            ]}
+          >
+            <ServiceContentEditor legacyContent={editing?.content} />
           </Form.Item>
         </Form>
       </Modal>

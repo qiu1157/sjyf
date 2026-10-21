@@ -17,9 +17,11 @@ interface ImageUploadProps {
   onChange?: (value: string) => void;
   type?: 'category-icon' | 'service-image' | 'banner-image' | 'content-image';
   hint?: string;
+  /** 紧凑模式：单图方块（多图宫格列表内使用），默认 false */
+  compact?: boolean;
 }
 
-export default function ImageUpload({ value, onChange, type = 'category-icon', hint = '推荐 200×200 正方形' }: ImageUploadProps) {
+export default function ImageUpload({ value, onChange, type = 'category-icon', hint = '推荐 200×200 正方形', compact = false }: ImageUploadProps) {
   const [loading, setLoading] = useState(false);
 
   // 上传前校验：格式 + 大小
@@ -68,26 +70,26 @@ export default function ImageUpload({ value, onChange, type = 'category-icon', h
         showUploadList={false}
         beforeUpload={beforeUpload}
         customRequest={customRequest}
-        style={{ width: 160, height: 80 }}
+        style={compact ? { width: 88, height: 88, padding: 0 } : { width: 160, height: 80 }}
       >
         {loading ? (
           <p style={{ margin: 0, color: '#999', fontSize: 12 }}>上传中...</p>
         ) : (
           <>
-            <p style={{ margin: '4px 0', fontSize: 12, color: '#999' }}>
-              <InboxOutlined style={{ fontSize: 20, marginRight: 4 }} />
-              点击上传图标
+            <p style={{ margin: compact ? '10px 0 0' : '4px 0', fontSize: 12, color: '#999' }}>
+              <InboxOutlined style={{ fontSize: compact ? 16 : 20, marginRight: 4 }} />
+              {compact ? '' : '点击上传图标'}
             </p>
-            <p style={{ margin: 0, fontSize: 11, color: '#bbb' }}>{hint}</p>
+            <p style={{ margin: 0, fontSize: 11, color: '#bbb' }}>{compact ? '上传图片' : hint}</p>
           </>
         )}
       </Upload.Dragger>
       {value && (
-        <div style={{ position: 'relative', width: 80, height: 80 }}>
+        <div style={{ position: 'relative', width: compact ? 88 : 80, height: compact ? 88 : 80 }}>
           <img
             src={value}
             alt="图标预览"
-            style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #E7DECF' }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1px solid #E7DECF' }}
           />
           <DeleteOutlined
             style={{
