@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <view class="detail page-container">
     <!-- 顶部导航栏 -->
     <view class="page-header" style="position: sticky; top: 0; z-index: 100;">
@@ -42,11 +42,18 @@
         </view>
       </view>
 
-      <!-- 详情说明：rich-text 渲染 content -->
+      <!-- 详情说明：mp-html 渲染 content 快照（图片自适应 + 点击预览 + 懒加载） -->
       <view class="section mx-base">
         <view class="section-title mb-md">服务包含</view>
         <view class="card card-padding">
-          <rich-text v-if="detail.content" :nodes="detail.content" class="rich-content"></rich-text>
+          <mp-html
+            v-if="contentHtml"
+            class="rich-content"
+            :content="contentHtml"
+            :preview-img="true"
+            :lazy-load="true"
+            selectable
+          />
           <view v-else class="mini muted">暂无详细说明</view>
         </view>
       </view>
@@ -82,6 +89,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
+import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html';
 import { api, request } from '../../utils/request';
 
 // 服务详情数据与页面状态
@@ -93,6 +101,17 @@ const isUnavailable = ref(false);
 // 是否有促销价：promo_price > 0 时展示划线原价 + 红色促销价
 const hasPromo = computed(() => {
   return !!detail.value && Number(detail.value.promo_price) > 0;
+});
+
+/**
+ * 详情 HTML（US-036）
+ * 存量服务的 content 是纯文本（含 \n），HTML 规则会折叠换行，此处对「不含标签的纯文本」做轻量预处理；
+ * 新内容为服务端生成的内联样式 HTML 快照，直接透传。
+ */
+const contentHtml = computed(() => {
+  const raw = detail.value?.content;
+  if (!raw) return '';
+  return raw.includes('<') ? raw : raw.replace(/\n/g, '<br/>');
 });
 
 // 页面加载：接收 id 参数并拉取服务详情
