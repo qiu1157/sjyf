@@ -103,36 +103,44 @@
       </scroll-view>
     </view>
 
-    <!-- 第四层：热销专区 -->
-    <view class="section section-last" v-if="hotList.length > 0">
+    <!-- 第四层：精选服务（2 列网格，与「最新活动」的横滑大卡形成形态区分） -->
+    <view class="section section-last" v-if="hotCards.length > 0">
       <view class="section-header">
-        <text class="section-title">热销专区</text>
-        <view class="badge badge-orange">限时特惠</view>
+        <view class="section-title-wrap">
+          <view class="section-icon-hot"></view>
+          <text class="section-title">精选服务</text>
+        </view>
+        <text class="section-more" @click="goCategory">更多 ›</text>
       </view>
-      <view class="vertical-list">
+      <view class="hot-grid">
         <view
-          class="vertical-card"
-          v-for="item in hotList"
-          :key="item.id"
-          @click="goDetail(item)"
+          class="hot-card"
+          v-for="card in hotCards"
+          :key="card.item.id"
+          @click="goDetail(card.item)"
         >
-          <image
-            v-if="resolveImg(item.thumbnail_image || item.cover_image)"
-            class="vertical-thumb"
-            :src="resolveImg(item.thumbnail_image || item.cover_image)"
-            mode="aspectFill"
-          />
-          <view v-else class="vertical-thumb vertical-thumb-placeholder">
-            <text class="vertical-thumb-text">{{ placeholderChar(item.name) }}</text>
+          <view class="hot-thumb-box">
+            <image
+              v-if="resolveImg(card.thumb)"
+              class="hot-thumb"
+              :src="resolveImg(card.thumb)"
+              mode="aspectFill"
+            />
+            <view v-else class="hot-thumb hot-thumb-placeholder">
+              <text class="hot-thumb-text">{{ placeholderChar(card.item.name) }}</text>
+            </view>
+            <!-- 角标由真实促销价派生：每卡最多 1 个且必须带文字 -->
+            <view class="hot-badge" v-if="card.hasPromo">限时特惠</view>
           </view>
-          <view class="vertical-info">
-            <text class="vertical-name line-clamp-2">{{ item.name }}</text>
-            <view class="vertical-price">
-              <template v-if="item.promo_price > 0">
-                <text class="price-promo">¥{{ formatPrice(item.promo_price) }}</text>
-                <text class="price-original">¥{{ formatPrice(item.price) }}</text>
+          <view class="hot-body">
+            <text class="hot-name">{{ card.item.name }}</text>
+            <text class="hot-attr" v-if="card.attrText">{{ card.attrText }}</text>
+            <view class="hot-price">
+              <template v-if="card.hasPromo">
+                <text class="hot-price-promo">¥{{ formatPrice(card.item.promo_price) }}</text>
+                <text class="hot-price-original">¥{{ formatPrice(card.item.price) }}</text>
               </template>
-              <text v-else class="price-current">¥{{ formatPrice(item.price) }}</text>
+              <text v-else class="hot-price-current">¥{{ formatPrice(card.item.price) }}</text>
             </view>
           </view>
         </view>
@@ -230,9 +238,11 @@ const placeholderChar = (name: string) => {
   return name ? name.charAt(0) : '?';
 };
 
+// 价格格式化：整数不带小数（与分类页口径保持一致，US-047 验收场景 9）
 const formatPrice = (val: any) => {
-  const n = Number(val);
-  return isNaN(n) ? '0.00' : n.toFixed(2);
+  const n = Number(val || 0);
+  if (isNaN(n)) return '0';
+  return n % 1 === 0 ? String(n) : n.toFixed(2);
 };
 
 // 省额展示：最多保留 2 位小数并去掉多余的 0（如 50 -> "50"，33.20 -> "33.2"）
@@ -262,6 +272,30 @@ const latestCards = computed(() =>
     item,
     hasPromo: Number(item.promo_price) > 0,
     subText: buildPromoText(item),
+  })),
+);
+
+// 服务方式短文案（首页卡片从简，与详情页的完整文案刻意区分）：1 上门 / 2 到店 / 3 上门或到店
+const SERVICE_MODE_TEXT: Record<number, string> = { 1: '上门', 2: '到店', 3: '上门或到店' };
+
+// 服务属性行：时长与方式只显示已填部分；两项都未填时返回空串，模板据此不渲染该行（不留空行）
+const buildAttrText = (item: any): string => {
+  const parts: string[] = [];
+  const duration = Number(item.duration);
+  if (duration > 0) parts.push(`${duration}分钟`);
+  const modeText = SERVICE_MODE_TEXT[Number(item.service_mode)];
+  if (modeText) parts.push(modeText);
+  return parts.join(' · ');
+};
+
+// 精选服务 2×2：最多 4 张（后端已限 4 条，前端 slice 为冗余兜底）
+// 预计算缩略图与属性行，避免模板内对同一项重复计算（性能优化）
+const hotCards = computed(() =>
+  hotList.value.slice(0, 4).map((item) => ({
+    item,
+    hasPromo: Number(item.promo_price) > 0,
+    thumb: item.thumbnail_image || item.cover_image,
+    attrText: buildAttrText(item),
   })),
 );
 
@@ -416,6 +450,12 @@ const goDetail = (item: any) => {
   margin-right: 10rpx;
 }
 
+// 精选服务标题图标（火焰，主色）
+.section-icon-hot {
+  @include sj-icon('flame', 32rpx, $color-primary);
+  margin-right: 10rpx;
+}
+
 // 最新活动：横滑大卡
 // 该板块不用 .section 左右留白，改为「标题留白 + 满宽滚动容器内边距」，
 // 让卡片能横向滚到页面边缘消失，而左侧仍与其它 .section 的 32rpx 栅格对齐
@@ -563,97 +603,118 @@ const goDetail = (item: any) => {
   white-space: nowrap;
 }
 
-// 纵向列表（最新活动+热销）
-.vertical-list {
+// 精选服务：2 列网格
+// 用 flex-wrap 而非 display:grid —— grid 在微信小程序端兼容性不稳，flex 双端一致
+.hot-grid {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  // 两端对齐：每行 2 张，中间自动留出 24rpx 间距，且左右与 .section 的 32rpx 栅格对齐
+  justify-content: space-between;
 }
 
-.vertical-card {
-  display: flex;
-  background: $bg-paper-soft;
-  border-radius: 20rpx;
-  padding: 24rpx;
+.hot-card {
+  // 两张卡各占半宽再各减去半个间距（12rpx），两卡 + 间距 = 满宽
+  width: calc(50% - 12rpx);
+  box-sizing: border-box;
   margin-bottom: 24rpx;
+  background: $bg-paper;
+  border-radius: 20rpx;
+  // 裁掉缩略图四角，使图片上边缘随卡片圆角
+  overflow: hidden;
   box-shadow: $shadow-light;
 }
 
-.vertical-thumb {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 16rpx;
-  flex-shrink: 0;
-  margin-right: 24rpx;
+.hot-thumb-box {
+  position: relative;
 }
 
-.vertical-thumb-placeholder {
+.hot-thumb {
+  display: block;
+  width: 100%;
+  height: 224rpx;
+}
+
+.hot-thumb-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
   background: $gradient-card;
 }
 
-.vertical-thumb-text {
-  font-size: 48rpx;
+.hot-thumb-text {
+  font-size: 56rpx;
+  font-weight: 600;
   color: $color-primary;
-  font-weight: 600;
 }
 
-.vertical-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+// 角标：warning 橙实底 + 白字。取 $color-warning-strong(#D96B16) 而非 $state-warning(#D99A3D)——
+// 后者与白字对比仅 2.43:1，不满足 WCAG 非文本对比 ≥3:1；前者为 3.46:1
+.hot-badge {
+  position: absolute;
+  top: 12rpx;
+  left: 12rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  line-height: 1.4;
+  font-weight: 700;
+  background: $color-warning-strong;
+  color: $neutral-0;
 }
 
-.vertical-name {
-  font-size: 30rpx;
+.hot-body {
+  padding: 16rpx 20rpx 20rpx;
+}
+
+.hot-name {
+  font-size: 28rpx;
   font-weight: 600;
+  line-height: 1.35;
   color: $text-primary;
-  margin-bottom: 16rpx;
+  // 服务名最多 2 行，保证同排卡片高度一致
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
 
-.vertical-price {
+// 服务属性行（家政关键决策信息）：240分钟 · 上门
+.hot-attr {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.3;
+  color: $text-secondary;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hot-price {
   display: flex;
   align-items: baseline;
+  margin-top: 12rpx;
 }
 
-.price-promo {
-  font-size: 40rpx;
+.hot-price-promo {
+  font-size: 36rpx;
   font-weight: 700;
-  color: $color-warning-strong;
-  margin-right: 12rpx;
+  line-height: 1;
+  color: $color-primary;
+  margin-right: 10rpx;
 }
 
-.price-original {
-  font-size: 24rpx;
+.hot-price-original {
+  font-size: 22rpx;
+  line-height: 1;
   color: $text-light;
   text-decoration: line-through;
 }
 
-.price-current {
-  font-size: 40rpx;
-  font-weight: 700;
-  color: $color-primary;
-}
-
-// 徽章
-.badge {
-  display: inline-flex;
-  padding: 10rpx 18rpx;
-  border-radius: 999rpx;
-  font-size: 24rpx;
+.hot-price-current {
+  font-size: 36rpx;
   font-weight: 700;
   line-height: 1;
-}
-
-.badge-orange {
-  background: $bg-tag-orange;
-  color: $color-orange;
+  color: $color-primary;
 }
 
 // 空状态
