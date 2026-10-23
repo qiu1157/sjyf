@@ -33,14 +33,19 @@ export interface ImageGroupBlock {
   columns: 2 | 3;
   images: ImageItem[];
 }
+/** 历史兼容形态：自由文本「参数名 + 参数值」 */
 export interface ParamItem {
   label: string;
   value: string;
 }
+/** 参数清单可绑定的服务档案字段键（受控词典，顺序即渲染顺序）（US-039） */
+export type ParamKey = 'duration' | 'people_count' | 'area_max' | 'price_unit' | 'scope' | 'validity_days';
+/** 参数清单条目：绑定字段（{key}）或历史手填（{label,value}）（US-039） */
+export type ParamsItem = { key: ParamKey } | ParamItem;
 export interface ParamsBlock {
   id: string;
   type: 'params';
-  items: ParamItem[];
+  items: ParamsItem[];
 }
 
 export type ContentBlock = HeadingBlock | TextBlock | ImageBlock | ImageGroupBlock | ParamsBlock;
@@ -89,7 +94,8 @@ export function createBlock(type: BlockType): ContentBlock {
     case 'imageGroup':
       return { id: genBlockId(), type: 'imageGroup', columns: 2, images: [{ url: '' }] };
     case 'params':
-      return { id: genBlockId(), type: 'params', items: [{ label: '', value: '' }] };
+      // US-039：新建参数块默认绑定「服务时长」字段（值从服务档案继承，不再是自由文本）
+      return { id: genBlockId(), type: 'params', items: [{ key: 'duration' }] };
   }
 }
 
@@ -167,13 +173,146 @@ export function validateBlocks(blocks: ContentBlock[]): string | null {
     }
     if (block.type === 'params') {
       if (block.items.length === 0) return `${prefix}参数条目需 1-12 条`;
-      if (block.items.some((item) => !item.label.trim() || !item.value.trim())) {
+      // 仅历史手填项需要校验填写完整；绑定字段项的值来自服务档案，无需在此校验
+      const legacyItems = block.items.filter((item): item is ParamItem => 'label' in item);
+      if (legacyItems.some((item) => !item.label.trim() || !item.value.trim())) {
         return `${prefix}参数名与参数值需填写完整`;
       }
     }
   }
   if (countImages(blocks) > MAX_IMAGES) return `内容块图片总数最多 ${MAX_IMAGES} 张`;
   return null;
+}
+
+// ============ US-039：参数清单「绑定字段」派生规则（前端唯一实现，编辑器与预览共用） ============
+
+/** 参数清单字段键的固定顺序（与后端 content-blocks.util.ts 的 PARAM_KEY_ORDER 一致） */
+export const PARAM_KEY_ORDER: ParamKey[] = [
+  'duration',
+  'people_count',
+  'area_max',
+  'price_unit',
+  'scope',
+  'validity_days',
+];
+
+/** 字段键 → 中文标签（与后端 PARAM_KEY_LABELS 一致） */
+export const PARAM_KEY_LABELS: Record<ParamKey, string> = {
+  duration: '服务时长',
+  people_count: '服务人数',
+  area_max: '适用面积',
+  price_unit: '计价方式',
+  scope: '服务地域',
+  validity_days: '服务期限',
+};
+
+/** 计价方式枚举文案（与后端 PRICE_UNIT_LABELS 一致） */
+export const PRICE_UNIT_LABELS: Record<number, string> = {
+  1: '按次一口价',
+  2: '按小时计费',
+  3: '按平方米计费',
+  4: '按人天计费',
+  5: '面议',
+};
+
+/** 服务档案字段值来源（宽松，供派生规则读取） */
+export interface ParamFieldValues {
+  duration?: number | string | null;
+  people_count?: number | string | null;
+  area_max?: number | string | null;
+  price_unit?: number | string | null;
+  scope?: string | null;
+  validity_days?: number | string | null;
+}
+
+/** 弱类型数字转「正数」：空 / 非数字 / ≤0 → null（视为未填写） */
+function toPositiveNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const num = typeof value === 'number' ? value : Number(String(value).trim());
+  if (!Number.isFinite(num) || num <= 0) return null;
+  return num;
+}
+
+/** 判断某档案字段是否已填写（用于「该字段未填写」提示） */
+export function isParamFieldFilled(key: ParamKey, source: ParamFieldValues): boolean {
+  if (key === 'scope') return typeof source.scope === 'string' && source.scope.trim() !== '';
+  return toPositiveNumber(source[key]) !== null;
+}
+
+/**
+ * 从表单全量值中抽取「参数清单」可绑定的 6 个档案字段，作为 Form.useWatch 的选择器使用。
+ * 注意：Form.useWatch 的首参是「单个字段路径」，直接传字段名数组会被当成嵌套路径读取而取值为空；
+ * 用选择器函数既能取到 6 个字段，又只在这 6 个字段变化时才触发重渲染（避免无关字段输入时反复刷新参数块）。
+ */
+export function selectParamFieldValues(values: Record<string, unknown> | null | undefined): ParamFieldValues {
+  const picked = {} as Record<ParamKey, unknown>;
+  for (const key of PARAM_KEY_ORDER) picked[key] = values ? values[key] : undefined;
+  return picked as ParamFieldValues;
+}
+
+/**
+ * US-039：单个字段键 → 展示行（{label, value}）
+ * 派生规则与后端 buildDetailSections 保持一致（后端另有一份实现，用于 detail_sections 投影）
+ */
+export function deriveParamRow(key: ParamKey, source: ParamFieldValues): { label: string; value: string } {
+  switch (key) {
+    case 'duration': {
+      const n = toPositiveNumber(source.duration);
+      return { label: PARAM_KEY_LABELS.duration, value: n === null ? '—' : n % 60 === 0 && n >= 60 ? `${n / 60} 小时` : `${n} 分钟` };
+    }
+    case 'people_count': {
+      const n = toPositiveNumber(source.people_count);
+      return { label: PARAM_KEY_LABELS.people_count, value: n === null ? '不限' : `最多 ${n} 人` };
+    }
+    case 'area_max': {
+      const n = toPositiveNumber(source.area_max);
+      return { label: PARAM_KEY_LABELS.area_max, value: n === null ? '不限' : `${n}㎡ 以内` };
+    }
+    case 'price_unit': {
+      const n = toPositiveNumber(source.price_unit);
+      return { label: PARAM_KEY_LABELS.price_unit, value: (n !== null && PRICE_UNIT_LABELS[n]) || '面议' };
+    }
+    case 'scope': {
+      const s = typeof source.scope === 'string' ? source.scope.trim() : '';
+      return { label: PARAM_KEY_LABELS.scope, value: s || '到店咨询' };
+    }
+    case 'validity_days': {
+      const n = toPositiveNumber(source.validity_days);
+      return { label: PARAM_KEY_LABELS.validity_days, value: n === null ? '长期有效' : `下单后 ${n} 天内有效` };
+    }
+  }
+}
+
+/** 判断条目是否为「绑定字段」形态 */
+export function isKeyedParamItem(item: ParamsItem): item is { key: ParamKey } {
+  return 'key' in item;
+}
+
+/** 用 label 文本匹配白名单字段（历史手填项一键升级时用于预选） */
+export function matchParamKeyByLabel(label: string): ParamKey | null {
+  const text = (label || '').trim();
+  return PARAM_KEY_ORDER.find((key) => PARAM_KEY_LABELS[key] === text) ?? null;
+}
+
+/**
+ * US-039：参数清单最终展示行（手机预览用，与小程序详情页一致）
+ * - 绑定字段项按白名单固定顺序在前，值实时派生自服务档案
+ * - 历史手填项按原顺序追加在后
+ */
+export function summarizeParamsItems(
+  items: ParamsItem[],
+  source: ParamFieldValues,
+): { label: string; value: string }[] {
+  const presentKeys = new Set<ParamKey>();
+  const legacy: ParamItem[] = [];
+  for (const item of items) {
+    if (isKeyedParamItem(item)) presentKeys.add(item.key);
+    else if (item && typeof item === 'object') legacy.push(item);
+  }
+  const rows: { label: string; value: string }[] = [];
+  for (const key of PARAM_KEY_ORDER) if (presentKeys.has(key)) rows.push(deriveParamRow(key, source));
+  for (const item of legacy) rows.push({ label: item.label, value: item.value });
+  return rows;
 }
 
 /** 内容模板（US-037）：一键套用，覆盖当前块内容 */

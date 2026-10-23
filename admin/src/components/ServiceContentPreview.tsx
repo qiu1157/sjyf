@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import type { ContentBlock, ImageItem } from '../utils/contentBlocks';
+import { Form } from 'antd';
+import type { ContentBlock, ImageItem, ParamFieldValues, ParamsItem } from '../utils/contentBlocks';
+import { selectParamFieldValues, summarizeParamsItems } from '../utils/contentBlocks';
 
 /**
  * 手机尺寸实时预览（US-034）
@@ -57,6 +59,41 @@ function PreviewImageCell({ image, width }: { image: ImageItem; width: string })
   );
 }
 
+/**
+ * 参数清单预览（US-039）：值实时派生自「服务档案」区，与小程序详情页一致
+ * 复用 contentBlocks.ts 的 summarizeParamsItems，本文件不重复实现派生规则
+ */
+function ParamsBlockView({ items }: { items: ParamsItem[] }) {
+  const form = Form.useFormInstance();
+  // 与 ParamsBlockEditor 一致：用选择器抽取档案字段（Form.useWatch 首参是单个字段路径）
+  const source = Form.useWatch(selectParamFieldValues, form) as ParamFieldValues | undefined;
+  const rows = summarizeParamsItems(items, source ?? {});
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse', margin: '0 0 12px', fontSize: 13 }}>
+      <tbody>
+        {rows.map((row, index) => (
+          <tr key={index}>
+            <td
+              style={{
+                padding: '8px 10px',
+                background: '#FAF6F1',
+                color: '#8A7F76',
+                width: '38%',
+                borderBottom: '1px solid #F0E9E0',
+              }}
+            >
+              {row.label}
+            </td>
+            <td style={{ padding: '8px 10px', color: '#2B2018', borderBottom: '1px solid #F0E9E0' }}>
+              {row.value}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function BlockView({ block }: { block: ContentBlock }) {
   switch (block.type) {
     case 'heading':
@@ -110,30 +147,7 @@ function BlockView({ block }: { block: ContentBlock }) {
       );
     }
     case 'params':
-      return (
-        <table style={{ width: '100%', borderCollapse: 'collapse', margin: '0 0 12px', fontSize: 13 }}>
-          <tbody>
-            {block.items.map((item, index) => (
-              <tr key={index}>
-                <td
-                  style={{
-                    padding: '8px 10px',
-                    background: '#FAF6F1',
-                    color: '#8A7F76',
-                    width: '38%',
-                    borderBottom: '1px solid #F0E9E0',
-                  }}
-                >
-                  {item.label}
-                </td>
-                <td style={{ padding: '8px 10px', color: '#2B2018', borderBottom: '1px solid #F0E9E0' }}>
-                  {item.value}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      );
+      return <ParamsBlockView items={block.items} />;
   }
 }
 

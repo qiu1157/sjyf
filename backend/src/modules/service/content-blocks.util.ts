@@ -34,14 +34,28 @@ export interface ImageGroupBlock {
   columns: 2 | 3;
   images: ImageItem[];
 }
+/** 历史兼容形态：自由文本「参数名 + 参数值」 */
 export interface ParamItem {
   label: string;
   value: string;
 }
+/** 参数清单可绑定的服务档案字段键（受控词典，顺序即渲染顺序）（US-039） */
+export type ParamKey = 'duration' | 'people_count' | 'area_max' | 'price_unit' | 'scope' | 'validity_days';
+export const PARAM_KEY_ORDER: readonly ParamKey[] = [
+  'duration',
+  'people_count',
+  'area_max',
+  'price_unit',
+  'scope',
+  'validity_days',
+];
+const PARAM_KEY_SET: ReadonlySet<string> = new Set(PARAM_KEY_ORDER);
+/** 参数清单条目：绑定字段（{key}）或历史手填（{label,value}）（US-039） */
+export type ParamsItem = { key: ParamKey } | ParamItem;
 export interface ParamsBlock {
   id: string;
   type: 'params';
-  items: ParamItem[];
+  items: ParamsItem[];
 }
 
 export type ContentBlock = HeadingBlock | TextBlock | ImageBlock | ImageGroupBlock | ParamsBlock;
@@ -165,7 +179,17 @@ export function normalizeBlocks(raw: unknown): ContentBlocksPayload | null {
         if (!Array.isArray(itemsRaw) || itemsRaw.length < 1 || itemsRaw.length > 12) {
           blockError(index, '参数条目需 1-12 条');
         }
-        const items: ParamItem[] = itemsRaw.map((rawItem: any) => {
+        const seenKeys = new Set<string>();
+        const items: ParamsItem[] = itemsRaw.map((rawItem: any) => {
+          // US-039 新形态：只存服务档案字段键，值与标签由服务端从结构化字段派生
+          if (rawItem && typeof rawItem === 'object' && !Array.isArray(rawItem) && 'key' in rawItem) {
+            const key = asString(rawItem.key).trim();
+            if (!PARAM_KEY_SET.has(key)) blockError(index, '参数字段不在允许范围内');
+            if (seenKeys.has(key)) blockError(index, '同一参数字段不可重复添加');
+            seenKeys.add(key);
+            return { key: key as ParamKey };
+          }
+          // 历史兼容形态：自由文本键值对（校验规则保持不变）
           const label = asString(rawItem?.label).trim();
           const value = asString(rawItem?.value).trim();
           if (label.length < 1 || label.length > 20) blockError(index, '参数名需 1-20 字符');
@@ -228,7 +252,8 @@ export function renderBlocksToHtml(payload: ContentBlocksPayload): string {
         break;
       }
       case 'params': {
-        const rows = block.items
+        // 不可达：params 属结构化块，已在循环开头被跳过（保留历史渲染逻辑，不清理）
+        const rows = (block.items as ParamItem[])
           .map(
             (item) =>
               `<tr><td style="padding:8px 10px;background:#FAF6F1;color:#8A7F76;width:38%;border-bottom:1px solid #F0E9E0;">${escapeHtml(item.label)}</td><td style="padding:8px 10px;color:#2B2018;border-bottom:1px solid #F0E9E0;">${escapeHtml(item.value)}</td></tr>`,
@@ -336,43 +361,113 @@ function hasStructuredContentBlock(raw: unknown): boolean {
   return payload.blocks.some((block) => STRUCTURED_BLOCK_TYPE_SET.has(block.type));
 }
 
+/** 参数清单字段键 → 派生标签（与前端 admin/src/utils/contentBlocks.ts 的 PARAM_KEY_LABELS 一致） */
+const PARAM_KEY_LABELS: Record<ParamKey, string> = {
+  duration: '服务时长',
+  people_count: '服务人数',
+  area_max: '适用面积',
+  price_unit: '计价方式',
+  scope: '服务地域',
+  validity_days: '服务期限',
+};
+
+/** 服务档案派生上下文（已归一化：数字为 null 表示未填写） */
+interface ParamDeriveContext {
+  duration: number | null;
+  peopleCount: number | null;
+  areaMax: number | null;
+  priceUnit: number | null;
+  scope: string;
+  validityDays: number | null;
+}
+
+/**
+ * US-039：单个参数键 → 展示行。派生规则沿用 US-038，仅做「按需输出」。
+ * 说明：前端 admin/src/utils/contentBlocks.ts 的 deriveParamRow 为同规则的另一份实现（前后端各需一份，无法共享代码）。
+ * duration 为空时沿用 US-038 的「跳过整行」语义（返回 null）。
+ */
+function deriveParamRow(key: ParamKey, ctx: ParamDeriveContext): DetailSectionParam | null {
+  switch (key) {
+    case 'duration':
+      if (ctx.duration === null) return null;
+      return {
+        label: PARAM_KEY_LABELS.duration,
+        value: ctx.duration % 60 === 0 && ctx.duration >= 60 ? `${ctx.duration / 60} 小时` : `${ctx.duration} 分钟`,
+      };
+    case 'people_count':
+      return { label: PARAM_KEY_LABELS.people_count, value: ctx.peopleCount !== null ? `最多 ${ctx.peopleCount} 人` : '不限' };
+    case 'area_max':
+      return { label: PARAM_KEY_LABELS.area_max, value: ctx.areaMax !== null ? `${ctx.areaMax}㎡ 以内` : '不限' };
+    case 'price_unit':
+      return { label: PARAM_KEY_LABELS.price_unit, value: ctx.priceUnit !== null ? PRICE_UNIT_LABELS[ctx.priceUnit] || '面议' : '面议' };
+    case 'scope':
+      return { label: PARAM_KEY_LABELS.scope, value: ctx.scope || '到店咨询' };
+    case 'validity_days':
+      return { label: PARAM_KEY_LABELS.validity_days, value: ctx.validityDays !== null ? `下单后 ${ctx.validityDays} 天内有效` : '长期有效' };
+  }
+}
+
+/** 取块数据中的第一个 params 块（US-039：只有存在 params 块才输出参数行） */
+function findParamsBlock(raw: unknown): ParamsBlock | null {
+  const payload = parseStoredBlocks(raw);
+  if (!payload) return null;
+  return (payload.blocks.find((block) => block.type === 'params') as ParamsBlock | undefined) ?? null;
+}
+
+/**
+ * US-039：由 params 块条目 + 服务档案派生参数行
+ * - {key} 项：按白名单固定顺序输出（与运营添加先后无关）
+ * - 历史 {label,value} 项：原样、按素材原顺序追加在尾部
+ */
+function buildParamsRows(items: ParamsItem[], ctx: ParamDeriveContext): DetailSectionParam[] {
+  const presentKeys = new Set<ParamKey>();
+  const legacy: ParamItem[] = [];
+  for (const item of items) {
+    if (item && typeof item === 'object' && 'key' in item) {
+      presentKeys.add((item as { key: ParamKey }).key);
+    } else if (item && typeof item === 'object') {
+      legacy.push(item as ParamItem);
+    }
+  }
+  const rows: DetailSectionParam[] = [];
+  for (const key of PARAM_KEY_ORDER) {
+    if (!presentKeys.has(key)) continue;
+    const row = deriveParamRow(key, ctx);
+    if (row) rows.push(row);
+  }
+  for (const item of legacy) rows.push({ label: item.label, value: item.value });
+  return rows;
+}
+
 /**
  * 由服务档案派生只读渲染视图 detail_sections（纯计算，不抛错）
  * - has_structured_content：结构化字段任一有值，或 content_blocks 含结构化块；
- *   注意 legacy 字段 duration / scope 单独有值不算（保证存量服务零回归）
- * - 为 false 时 params 恒为 []
- * - 为 true 时按固定顺序输出：服务时长 → 服务人数 → 适用面积 → 计价方式 → 服务地域 → 服务期限
+ *   legacy 字段 duration / scope 单独有值不算（保证存量服务零回归）—— 此定义自 US-038 起保持不变
+ * - US-039 行为演进：params 改为「只输出 params 块中已添加的字段行」；无 params 块时 params = []
+ *   （US-038 时期为「只要结构化字段有值就恒输出 6 行」，本次已废弃）
  */
 export function buildDetailSections(item: StructuredFieldSource): DetailSections {
-  const duration = toPositiveNumber(item.duration);
-  const peopleCount = toPositiveNumber(item.people_count);
-  const areaMax = toPositiveNumber(item.area_max);
-  const priceUnit = toPositiveNumber(item.price_unit);
-  const validityDays = toPositiveNumber(item.validity_days);
+  const ctx: ParamDeriveContext = {
+    duration: toPositiveNumber(item.duration),
+    peopleCount: toPositiveNumber(item.people_count),
+    areaMax: toPositiveNumber(item.area_max),
+    priceUnit: toPositiveNumber(item.price_unit),
+    scope: typeof item.scope === 'string' ? item.scope.trim() : '',
+    validityDays: toPositiveNumber(item.validity_days),
+  };
   const serviceMode = toPositiveNumber(item.service_mode);
-  const scope = typeof item.scope === 'string' ? item.scope.trim() : '';
 
   const hasStructuredField =
     serviceMode !== null ||
-    peopleCount !== null ||
-    areaMax !== null ||
-    priceUnit !== null ||
-    validityDays !== null;
+    ctx.peopleCount !== null ||
+    ctx.areaMax !== null ||
+    ctx.priceUnit !== null ||
+    ctx.validityDays !== null;
   if (!hasStructuredField && !hasStructuredContentBlock(item.content_blocks)) {
     return { has_structured_content: false, params: [] };
   }
 
-  const params: DetailSectionParam[] = [];
-  // 服务时长：无条件行（duration 默认 60），为空/0 时跳过整行
-  if (duration !== null) {
-    const durationText = duration >= 60 && duration % 60 === 0 ? `${duration / 60} 小时` : `${duration} 分钟`;
-    params.push({ label: '服务时长', value: durationText });
-  }
-  params.push({ label: '服务人数', value: peopleCount !== null ? `最多 ${peopleCount} 人` : '不限' });
-  params.push({ label: '适用面积', value: areaMax !== null ? `${areaMax}㎡ 以内` : '不限' });
-  params.push({ label: '计价方式', value: priceUnit !== null ? PRICE_UNIT_LABELS[priceUnit] || '面议' : '面议' });
-  params.push({ label: '服务地域', value: scope || '到店咨询' });
-  params.push({ label: '服务期限', value: validityDays !== null ? `下单后 ${validityDays} 天内有效` : '长期有效' });
-
-  return { has_structured_content: true, params };
+  const paramsBlock = findParamsBlock(item.content_blocks);
+  if (!paramsBlock) return { has_structured_content: true, params: [] };
+  return { has_structured_content: true, params: buildParamsRows(paramsBlock.items, ctx) };
 }
