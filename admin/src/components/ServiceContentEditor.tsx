@@ -12,6 +12,7 @@ import {
   PictureOutlined,
   PlusOutlined,
   ProfileOutlined,
+  SafetyCertificateOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import {
@@ -35,7 +36,9 @@ import TextBlockEditor from './blocks/TextBlockEditor';
 import ImageBlockEditor from './blocks/ImageBlockEditor';
 import ImageGroupBlockEditor from './blocks/ImageGroupBlockEditor';
 import ParamsBlockEditor from './blocks/ParamsBlockEditor';
+import GuaranteeBlockEditor from './blocks/GuaranteeBlockEditor';
 import ServiceContentPreview from './ServiceContentPreview';
+import { colors } from '../theme';
 import {
   BLOCK_TYPE_LABELS,
   BLOCK_TYPES,
@@ -63,6 +66,7 @@ const TYPE_ICONS: Record<BlockType, React.ReactNode> = {
   image: <PictureOutlined />,
   imageGroup: <AppstoreOutlined />,
   params: <ProfileOutlined />,
+  guarantee: <SafetyCertificateOutlined />,
 };
 
 const TYPE_TAG_COLOR: Record<BlockType, string> = {
@@ -71,6 +75,7 @@ const TYPE_TAG_COLOR: Record<BlockType, string> = {
   image: '#5B8C5A',
   imageGroup: '#8A6BA8',
   params: '#D99A3D',
+  guarantee: colors.primary700,
 };
 
 /** 按块类型分发到对应的编辑子组件 */
@@ -92,6 +97,8 @@ function BlockEditorSwitch({
       return <ImageGroupBlockEditor block={block} onChange={onChange} />;
     case 'params':
       return <ParamsBlockEditor block={block} onChange={onChange} />;
+    case 'guarantee':
+      return <GuaranteeBlockEditor block={block} onChange={onChange} />;
   }
 }
 

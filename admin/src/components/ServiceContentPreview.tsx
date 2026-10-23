@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Form } from 'antd';
-import type { ContentBlock, ImageItem, ParamFieldValues, ParamsItem } from '../utils/contentBlocks';
+import type { ContentBlock, GuaranteeItem, ImageItem, ParamFieldValues, ParamsItem } from '../utils/contentBlocks';
 import { selectParamFieldValues, summarizeParamsItems } from '../utils/contentBlocks';
+import GuaranteeIconSvg from './blocks/GuaranteeIcons';
+import { colors } from '../theme';
 
 /**
  * 手机尺寸实时预览（US-034）
@@ -94,6 +96,47 @@ function ParamsBlockView({ items }: { items: ParamsItem[] }) {
   );
 }
 
+/**
+ * 服务保障预览（US-040）：与小程序详情页保障区一致（图标 + 标题 + 说明，横向 flex-wrap 排布）
+ */
+function GuaranteeBlockView({ items }: { items: GuaranteeItem[] }) {
+  return (
+    <>
+      <div style={{ fontSize: 15, fontWeight: 700, color: colors.neutral900, margin: '18px 0 10px' }}>
+        服务保障
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '0 0 12px' }}>
+        {items.map((item, index) => (
+          <div
+            key={index}
+            style={{
+              flex: '0 0 calc((100% - 16px) / 3)',
+              minWidth: 0,
+              boxSizing: 'border-box',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+              padding: '12px 6px',
+              borderRadius: 8,
+              background: colors.primary50,
+              textAlign: 'center',
+            }}
+          >
+            <GuaranteeIconSvg name={item.icon} size={20} color={colors.primaryDark} />
+            <div style={{ fontSize: 12, fontWeight: 700, color: colors.primary700, wordBreak: 'break-word' }}>
+              {item.title || '（未填写标题）'}
+            </div>
+            {item.desc ? (
+              <div style={{ fontSize: 11, color: colors.neutral600, lineHeight: 1.3 }}>{item.desc}</div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function BlockView({ block }: { block: ContentBlock }) {
   switch (block.type) {
     case 'heading':
@@ -148,6 +191,8 @@ function BlockView({ block }: { block: ContentBlock }) {
     }
     case 'params':
       return <ParamsBlockView items={block.items} />;
+    case 'guarantee':
+      return <GuaranteeBlockView items={block.items} />;
   }
 }
 

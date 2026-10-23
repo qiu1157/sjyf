@@ -6,7 +6,7 @@ import { BadRequestException } from '@nestjs/common';
  * 详细规则见 docs/specs/trae-specs/specs/service-content-block-editor/spec.md §3.3 / §5.3
  */
 
-export type BlockType = 'heading' | 'text' | 'image' | 'imageGroup' | 'params';
+export type BlockType = 'heading' | 'text' | 'image' | 'imageGroup' | 'params' | 'guarantee';
 
 export interface HeadingBlock {
   id: string;
@@ -58,21 +58,61 @@ export interface ParamsBlock {
   items: ParamsItem[];
 }
 
-export type ContentBlock = HeadingBlock | TextBlock | ImageBlock | ImageGroupBlock | ParamsBlock;
+/** 服务保障可选图标（lucide 名称白名单，禁止 emoji）（US-040） */
+export const GUARANTEE_ICON_NAMES = [
+  'shield-check',
+  'badge-check',
+  'clock',
+  'user-check',
+  'file-check',
+  'heart-handshake',
+  'wallet',
+  'award',
+  'sparkles',
+  'repeat',
+] as const;
+export type GuaranteeIcon = (typeof GUARANTEE_ICON_NAMES)[number];
+const GUARANTEE_ICON_SET: ReadonlySet<string> = new Set(GUARANTEE_ICON_NAMES);
+
+/** 服务保障项（US-040） */
+export interface GuaranteeItem {
+  icon: GuaranteeIcon;
+  title: string;
+  desc?: string;
+}
+export interface GuaranteeBlock {
+  id: string;
+  type: 'guarantee';
+  items: GuaranteeItem[];
+}
+
+export type ContentBlock =
+  | HeadingBlock
+  | TextBlock
+  | ImageBlock
+  | ImageGroupBlock
+  | ParamsBlock
+  | GuaranteeBlock;
 
 export interface ContentBlocksPayload {
   version: 1;
   blocks: ContentBlock[];
 }
 
-// 结构化块类型白名单（本期仅参数表 params）：此类块不进 HTML 快照，改由公开详情的 detail_sections 原生渲染，避免重复
-export const STRUCTURED_BLOCK_TYPES = ['params'] as const;
+// 结构化块类型白名单（参数表 params + 服务保障 guarantee）：此类块不进 HTML 快照，改由公开详情的 detail_sections 原生渲染，避免重复
+export const STRUCTURED_BLOCK_TYPES = ['params', 'guarantee'] as const;
 const STRUCTURED_BLOCK_TYPE_SET: ReadonlySet<BlockType> = new Set(STRUCTURED_BLOCK_TYPES);
 
 // 约束上限（与 spec §3.3 保持一致）
 const MAX_BLOCKS = 30;
 const MAX_IMAGES = 30;
 const MAX_HTML_BYTES = 200 * 1024;
+
+// 服务保障块约束（US-040，与 spec §10.1 一致）
+const MIN_GUARANTEE_ITEMS = 2;
+const MAX_GUARANTEE_ITEMS = 4;
+const MAX_GUARANTEE_TITLE = 8;
+const MAX_GUARANTEE_DESC = 20;
 
 /** 生成块唯一 id（仅用于编辑器排序与 diff，不参与渲染） */
 function genBlockId(): string {
@@ -197,6 +237,26 @@ export function normalizeBlocks(raw: unknown): ContentBlocksPayload | null {
           return { label, value };
         });
         return { id, type: 'params', items };
+      }
+      case 'guarantee': {
+        const itemsRaw = block.items;
+        if (!Array.isArray(itemsRaw) || itemsRaw.length < MIN_GUARANTEE_ITEMS || itemsRaw.length > MAX_GUARANTEE_ITEMS) {
+          blockError(index, '服务保障需 2-4 项');
+        }
+        const items: GuaranteeItem[] = itemsRaw.map((rawItem: any) => {
+          const icon = asString(rawItem?.icon).trim();
+          if (!GUARANTEE_ICON_SET.has(icon)) blockError(index, '保障图标不在可选范围内');
+          const title = asString(rawItem?.title).trim();
+          if (title.length < 1 || title.length > MAX_GUARANTEE_TITLE) {
+            blockError(index, `保障标题需 1-${MAX_GUARANTEE_TITLE} 字`);
+          }
+          const desc = asString(rawItem?.desc).trim();
+          if (desc.length > MAX_GUARANTEE_DESC) blockError(index, `保障说明最多 ${MAX_GUARANTEE_DESC} 字`);
+          const item: GuaranteeItem = { icon: icon as GuaranteeIcon, title };
+          if (desc) item.desc = desc;
+          return item;
+        });
+        return { id, type: 'guarantee', items };
       }
       default:
         blockError(index, `不支持的块类型 ${block.type}`);
@@ -328,9 +388,17 @@ export interface DetailSectionParam {
   value: string;
 }
 
-/** 只读渲染视图：小程序原生渲染参数表用 */
+/** detail_sections 单个服务保障项（US-040） */
+export interface DetailSectionGuarantee {
+  icon: string;
+  title: string;
+  desc: string;
+}
+
+/** 只读渲染视图：小程序原生渲染参数表 / 服务保障用 */
 export interface DetailSections {
   has_structured_content: boolean;
+  guarantees: DetailSectionGuarantee[];
   params: DetailSectionParam[];
 }
 
@@ -415,6 +483,18 @@ function findParamsBlock(raw: unknown): ParamsBlock | null {
 }
 
 /**
+ * US-040：取块数据中的第一个 guarantee 块 → 保障项渲染行
+ * 无块 / 脏数据 → 空数组（小程序端据此回退为默认三列保障）
+ */
+function findGuarantees(raw: unknown): DetailSectionGuarantee[] {
+  const payload = parseStoredBlocks(raw);
+  if (!payload) return [];
+  const block = payload.blocks.find((item) => item.type === 'guarantee') as GuaranteeBlock | undefined;
+  if (!block || !Array.isArray(block.items)) return [];
+  return block.items.map((item) => ({ icon: item.icon, title: item.title, desc: item.desc ?? '' }));
+}
+
+/**
  * US-039：由 params 块条目 + 服务档案派生参数行
  * - {key} 项：按白名单固定顺序输出（与运营添加先后无关）
  * - 历史 {label,value} 项：原样、按素材原顺序追加在尾部
@@ -464,10 +544,12 @@ export function buildDetailSections(item: StructuredFieldSource): DetailSections
     ctx.priceUnit !== null ||
     ctx.validityDays !== null;
   if (!hasStructuredField && !hasStructuredContentBlock(item.content_blocks)) {
-    return { has_structured_content: false, params: [] };
+    return { has_structured_content: false, guarantees: [], params: [] };
   }
 
+  // US-040：保障项与参数行相互独立，二者任一存在即输出，小程序端各自判断是否渲染该区
+  const guarantees = findGuarantees(item.content_blocks);
   const paramsBlock = findParamsBlock(item.content_blocks);
-  if (!paramsBlock) return { has_structured_content: true, params: [] };
-  return { has_structured_content: true, params: buildParamsRows(paramsBlock.items, ctx) };
+  if (!paramsBlock) return { has_structured_content: true, guarantees, params: [] };
+  return { has_structured_content: true, guarantees, params: buildParamsRows(paramsBlock.items, ctx) };
 }

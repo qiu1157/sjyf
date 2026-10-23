@@ -8,9 +8,15 @@ interface RequestOptions {
   silent401?: boolean;
 }
 
-// 服务详情：服务端派生的结构化渲染数据（US-038）
+// 服务详情：服务端派生的结构化渲染数据（US-038 / US-040）
 export interface DetailSectionParam { label: string; value: string }
-export interface DetailSections { has_structured_content: boolean; params: DetailSectionParam[] }
+/** 服务保障单项（US-040）：icon 为 lucide 名称白名单取值，desc 可为空串 */
+export interface DetailSectionGuarantee { icon: string; title: string; desc: string }
+export interface DetailSections {
+  has_structured_content: boolean;
+  params: DetailSectionParam[];
+  guarantees: DetailSectionGuarantee[];
+}
 export interface ServiceDetail {
   [key: string]: any;
   detail_sections?: DetailSections;

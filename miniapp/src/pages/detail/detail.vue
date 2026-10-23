@@ -79,10 +79,18 @@
         </view>
       </view>
 
-      <!-- 服务保障：保留 3 列 -->
+      <!-- 服务保障（US-040）：已配保障块 → 渲染该服务自己的保障项；未配置 → 回退存量硬编码三列 -->
       <view class="section mx-base">
         <view class="section-title mb-md">服务保障</view>
-        <view class="grid-3">
+        <view v-if="guarantees.length > 0" class="guarantee-list">
+          <view v-for="(item, index) in guarantees" :key="index" class="guarantee-item">
+            <view :class="['guarantee-icon', `gi-${item.icon}`]"></view>
+            <view class="guarantee-title">{{ item.title }}</view>
+            <view v-if="item.desc" class="guarantee-desc">{{ item.desc }}</view>
+          </view>
+        </view>
+        <!-- 历史回退：存量服务与未配保障的服务沿用原三列，展示与改造前一致 -->
+        <view v-else class="grid-3">
           <view class="cat-item">
             <view class="cat-icon">👤</view>
             <text>实名人员</text>
@@ -112,6 +120,7 @@ import { ref, computed } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html';
 import { api, request } from '../../utils/request';
+import type { DetailSectionGuarantee } from '../../utils/request';
 
 // 服务详情数据与页面状态
 const serviceId = ref(0);
@@ -139,6 +148,8 @@ const contentHtml = computed(() => {
 const detailSections = computed(() => detail.value?.detail_sections ?? null);
 // 服务参数表（顺序与文案由服务端派生，前端只渲染）
 const params = computed(() => detailSections.value?.params ?? []);
+// 服务保障项（US-040）：服务端派生；为空（未配保障块 / 存量服务）时回退硬编码三列
+const guarantees = computed<DetailSectionGuarantee[]>(() => detailSections.value?.guarantees ?? []);
 // 服务方式标签文案（US-038）：1 上门 / 2 到店 / 3 上门或到店
 const serviceModeLabel = computed(() => {
   const map: Record<number, string> = { 1: '上门服务', 2: '到店服务', 3: '上门/到店均可' };
@@ -211,6 +222,7 @@ const goBook = async () => {
 
 <style lang="scss" scoped>
 @use '../../styles/common.scss' as *;
+@use '../../styles/icons.scss' as *;
 
 .detail {
   padding-bottom: 100px;
@@ -353,6 +365,52 @@ const goBook = async () => {
   padding: 8px 10px;
   color: $text-primary;
   word-break: break-all;
+}
+
+// 服务保障区（US-040）：flex-wrap 排布（禁用 grid），窄屏自动折行
+.guarantee-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.guarantee-item {
+  flex: 0 0 calc((100% - #{$spacing-sm * 2}) / 3);
+  box-sizing: border-box;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: $spacing-md $spacing-sm;
+  border-radius: $radius-sm;
+  background: $bg-primary-tint;
+  text-align: center;
+}
+
+.guarantee-title {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-bold;
+  color: $text-primary-deep;
+  word-break: break-word;
+}
+
+.guarantee-desc {
+  font-size: 11px;
+  line-height: 1.3;
+  color: $text-secondary;
+  word-break: break-word;
+}
+
+// 保障图标：lucide base64 SVG 经 mask 上色（禁止 emoji）；图标名与后端白名单一致
+.guarantee-icon {
+  @include sj-icon('badge-check', 40rpx, $color-primary-dark);
+}
+
+@each $name in ('shield-check', 'badge-check', 'clock', 'user-check', 'file-check', 'heart-handshake', 'wallet', 'award', 'sparkles', 'repeat') {
+  .gi-#{$name} {
+    @include sj-icon($name, 40rpx, $color-primary-dark);
+  }
 }
 
 // 下架/不存在提示页

@@ -5,7 +5,7 @@
  * 详细规则见 docs/specs/trae-specs/specs/service-content-block-editor/spec.md §3.2 / §3.3
  */
 
-export type BlockType = 'heading' | 'text' | 'image' | 'imageGroup' | 'params';
+export type BlockType = 'heading' | 'text' | 'image' | 'imageGroup' | 'params' | 'guarantee';
 
 export interface HeadingBlock {
   id: string;
@@ -48,7 +48,40 @@ export interface ParamsBlock {
   items: ParamsItem[];
 }
 
-export type ContentBlock = HeadingBlock | TextBlock | ImageBlock | ImageGroupBlock | ParamsBlock;
+/** 服务保障可选图标（lucide 名称白名单，与后端 GUARANTEE_ICON_NAMES 一致）（US-040） */
+export const GUARANTEE_ICON_NAMES = [
+  'shield-check',
+  'badge-check',
+  'clock',
+  'user-check',
+  'file-check',
+  'heart-handshake',
+  'wallet',
+  'award',
+  'sparkles',
+  'repeat',
+] as const;
+export type GuaranteeIcon = (typeof GUARANTEE_ICON_NAMES)[number];
+
+/** 服务保障项（US-040） */
+export interface GuaranteeItem {
+  icon: GuaranteeIcon;
+  title: string;
+  desc?: string;
+}
+export interface GuaranteeBlock {
+  id: string;
+  type: 'guarantee';
+  items: GuaranteeItem[];
+}
+
+export type ContentBlock =
+  | HeadingBlock
+  | TextBlock
+  | ImageBlock
+  | ImageGroupBlock
+  | ParamsBlock
+  | GuaranteeBlock;
 
 export interface ContentBlocksPayload {
   version: 1;
@@ -65,22 +98,31 @@ export const MAX_TEXT_LENGTH = 2000;
 export const MAX_CAPTION_LENGTH = 30;
 export const MAX_PARAM_LABEL_LENGTH = 20;
 export const MAX_PARAM_VALUE_LENGTH = 50;
+// 服务保障块约束（US-040，与后端 content-blocks.util.ts 保持一致）
+export const MIN_GUARANTEE_ITEMS = 2;
+export const MAX_GUARANTEE_ITEMS = 4;
+export const MAX_GUARANTEE_TITLE_LENGTH = 8;
+export const MAX_GUARANTEE_DESC_LENGTH = 20;
 
 /** 生成块唯一 id（仅用于编辑器排序与 diff，不参与渲染） */
 export function genBlockId(): string {
   return `b_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** 5 种块的显示名与用途说明（图标由编辑器组件映射，保持本文件无框架依赖） */
+/** 6 种块的显示名与用途说明（图标由编辑器组件映射，保持本文件无框架依赖） */
 export const BLOCK_TYPE_LABELS: Record<BlockType, { label: string; description: string }> = {
   heading: { label: '小标题', description: '用于分段，如「服务包含」' },
   text: { label: '段落', description: '一段说明文字，支持换行' },
   image: { label: '单图', description: '一张大图，可加图注' },
   imageGroup: { label: '多图宫格', description: '2 列或 3 列图片墙，1-9 张' },
   params: { label: '参数清单', description: '键值对表格，如服务时长' },
+  guarantee: { label: '服务保障', description: '图标 + 标题 + 说明，2-4 项' },
 };
 
-export const BLOCK_TYPES: BlockType[] = ['heading', 'text', 'image', 'imageGroup', 'params'];
+export const BLOCK_TYPES: BlockType[] = ['heading', 'text', 'image', 'imageGroup', 'params', 'guarantee'];
+
+/** 新建保障块的默认图标序列（运营最常配置的三类保障） */
+export const DEFAULT_GUARANTEE_ITEMS: GuaranteeIcon[] = ['shield-check', 'badge-check', 'clock'];
 
 /** 各类型块的默认值工厂 */
 export function createBlock(type: BlockType): ContentBlock {
@@ -96,6 +138,9 @@ export function createBlock(type: BlockType): ContentBlock {
     case 'params':
       // US-039：新建参数块默认绑定「服务时长」字段（值从服务档案继承，不再是自由文本）
       return { id: genBlockId(), type: 'params', items: [{ key: 'duration' }] };
+    case 'guarantee':
+      // US-040：默认 3 项（满足 2~4 项下限），图标取白名单前三个，标题留空待运营填写
+      return { id: genBlockId(), type: 'guarantee', items: DEFAULT_GUARANTEE_ITEMS.map((icon) => ({ icon, title: '' })) };
   }
 }
 
@@ -177,6 +222,18 @@ export function validateBlocks(blocks: ContentBlock[]): string | null {
       const legacyItems = block.items.filter((item): item is ParamItem => 'label' in item);
       if (legacyItems.some((item) => !item.label.trim() || !item.value.trim())) {
         return `${prefix}参数名与参数值需填写完整`;
+      }
+    }
+    if (block.type === 'guarantee') {
+      if (block.items.length < MIN_GUARANTEE_ITEMS || block.items.length > MAX_GUARANTEE_ITEMS) {
+        return `${prefix}服务保障需 ${MIN_GUARANTEE_ITEMS}-${MAX_GUARANTEE_ITEMS} 项`;
+      }
+      if (block.items.some((item) => !item.title.trim())) return `${prefix}请填写保障标题`;
+      if (block.items.some((item) => item.title.trim().length > MAX_GUARANTEE_TITLE_LENGTH)) {
+        return `${prefix}保障标题最多 ${MAX_GUARANTEE_TITLE_LENGTH} 字`;
+      }
+      if (block.items.some((item) => (item.desc ?? '').trim().length > MAX_GUARANTEE_DESC_LENGTH)) {
+        return `${prefix}保障说明最多 ${MAX_GUARANTEE_DESC_LENGTH} 字`;
       }
     }
   }

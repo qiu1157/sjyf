@@ -8,6 +8,8 @@ export const colors = {
   primaryDark: '#9E5B37',    // primary-600 按钮按下态
   primaryLight: '#CB8750',   // primary-400
   primary100: '#F5E4D4',     // primary-100 浅色背景
+  primary50: '#FBF4EE',      // primary-50 极浅背景（详情保障卡底色）
+  primary700: '#7F482C',     // primary-700 深主色文字（详情保障标题）
 
   // 中性色
   neutral0: '#FFFFFF',       // neutral-0 白色背景

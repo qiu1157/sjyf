@@ -5,6 +5,7 @@ import request from '../utils/request';
 import { colors } from '../theme';
 import ImageUpload from '../components/ImageUpload';
 import ServiceContentEditor from '../components/ServiceContentEditor';
+import { validateBlocks, type ContentBlock } from '../utils/contentBlocks';
 
 export default function Services() {
   const [data, setData] = useState<any>({ list: [], total: 0 });
@@ -274,11 +275,12 @@ export default function Services() {
               rules={[
                 { required: true, message: '请至少添加一个内容块' },
                 {
-                  // 空块数组是合法对象，required 拦不住，需显式校验
-                  validator: (_, val) =>
-                    val && Array.isArray(val.blocks) && val.blocks.length > 0
-                      ? Promise.resolve()
-                      : Promise.reject(new Error('请至少添加一个内容块')),
+                  // 逐块校验（含 US-040 服务保障项数与字数）：不满足时阻止保存并说明原因
+                  validator: (_, val) => {
+                    const blocks: ContentBlock[] = Array.isArray(val?.blocks) ? val.blocks : [];
+                    const error = validateBlocks(blocks);
+                    return error ? Promise.reject(new Error(error)) : Promise.resolve();
+                  },
                 },
               ]}
             >
