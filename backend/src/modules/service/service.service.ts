@@ -239,10 +239,26 @@ export class ServiceService {
   }
 
   // 小程序端公开专区接口：按 display_zone 查上架服务列表
-  async listByZone(zone: number) {
+  // 首屏楼层只下发卡片展示所需的精简字段（白名单），避免携带详情正文 content / content_blocks 造成数据体积过大
+  // 排序：sort 升序，同值按 id 升序（即创建先后），保证运营排序生效且同值顺序稳定
+  async listByZone(zone: number, take: number) {
     return this.itemRepo.find({
       where: { display_zone: zone, status: 1, is_deleted: 0 },
-      order: { updated_at: 'DESC' },
+      select: [
+        'id',
+        'name',
+        'thumbnail_image',
+        'cover_image',
+        'banner_image',
+        'price',
+        'promo_price',
+        'duration',
+        'service_mode',
+        'display_zone',
+        'sort',
+      ],
+      order: { sort: 'ASC', id: 'ASC' },
+      take,
     });
   }
 

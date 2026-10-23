@@ -39,7 +39,7 @@ export default function Services() {
       }
       form.setFieldsValue({ ...row, content_blocks: contentBlocks });
     } else {
-      form.setFieldsValue({ display_zone: 0, status: 0 });
+      form.setFieldsValue({ display_zone: 0, status: 0, sort: 0 });
     }
     setModal(true);
   };
@@ -119,7 +119,7 @@ export default function Services() {
         ? <span style={{ color: colors.primary, fontWeight: 600 }}>¥{Number(promo).toFixed(2)}</span>
         : <span style={{ color: colors.neutral400 }}>-</span>,
     },
-    { title: '排序', dataIndex: 'sort', width: 70 },
+    { title: '排序', dataIndex: 'sort', width: 70, sorter: (a: any, b: any) => (a.sort ?? 0) - (b.sort ?? 0) },
     {
       title: '状态', dataIndex: 'status', width: 80,
       render: (s: number) => s === 1 ? <Tag color="green">上架</Tag> : <Tag>下架</Tag>,
@@ -336,6 +336,16 @@ export default function Services() {
                   <ImageUpload type="service-image" hint="JPG/PNG，≤2MB，推荐 750×350" />
                 </Form.Item>
               ) : null}
+            </Form.Item>
+
+            <Form.Item
+              name="sort"
+              label="排序"
+              // sort 列为 NOT NULL：清空时 normalize 兜底为 0，避免提交 null 触发数据库报错
+              normalize={(v) => (v == null ? 0 : v)}
+              extra="数字越小越靠前；未设置（0）的服务按创建先后排列"
+            >
+              <InputNumber min={0} style={{ width: '100%' }} placeholder="数字越小越靠前，空=0" />
             </Form.Item>
 
             <Form.Item name="status" label="是否上架" rules={[{ required: true }]}>

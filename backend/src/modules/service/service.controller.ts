@@ -34,15 +34,15 @@ export class ServiceController {
 
   @Public()
   @Get('services/banner')
-  publicBanner() { return this.svc.listByZone(1); }
+  publicBanner() { return this.svc.listByZone(1, 5); }
 
   @Public()
   @Get('services/latest')
-  publicLatest() { return this.svc.listByZone(2); }
+  publicLatest() { return this.svc.listByZone(2, 5); }
 
   @Public()
   @Get('services/hot')
-  publicHot() { return this.svc.listByZone(3); }
+  publicHot() { return this.svc.listByZone(3, 4); }
 
   // ===== 管理后台接口：品类（内容管理菜单）=====
   @Roles(1, 3)
