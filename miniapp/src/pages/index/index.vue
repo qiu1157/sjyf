@@ -76,6 +76,21 @@
       </swiper>
     </view>
 
+    <view class="section" v-else-if="loading">
+      <!-- 骨架：品类楼层位于「最新活动」之上，若不占位，其数据到达时会把下方楼层整体下推 -->
+      <view class="section-header">
+        <text class="section-title">服务分类</text>
+      </view>
+      <view class="cat-swiper">
+        <view class="cat-grid">
+          <view class="cat-item" v-for="n in 8" :key="n">
+            <view class="cat-icon cat-icon-skeleton"></view>
+            <view class="cat-name-skeleton"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <!-- 第三层：最新活动专区（横向滑动大卡，机制上杜绝自动播放） -->
     <view class="activity-section" v-if="latestCards.length > 0">
       <view class="section-header activity-header">
@@ -103,6 +118,21 @@
       </scroll-view>
     </view>
 
+    <view class="activity-section" v-else-if="loading">
+      <!-- 骨架：标题保留、卡片尺寸/间距与真实卡片一致，数据到达后不产生位移 -->
+      <view class="section-header activity-header">
+        <view class="section-title-wrap">
+          <view class="section-icon"></view>
+          <text class="section-title">最新活动</text>
+        </view>
+      </view>
+      <view class="activity-scroll" scroll-x="true" :show-scrollbar="false">
+        <view class="activity-track">
+          <view class="activity-skeleton" v-for="n in 2" :key="n"></view>
+        </view>
+      </view>
+    </view>
+
     <!-- 第四层：精选服务（2 列网格，与「最新活动」的横滑大卡形成形态区分） -->
     <view class="section section-last" v-if="hotCards.length > 0">
       <view class="section-header">
@@ -125,6 +155,7 @@
               class="hot-thumb"
               :src="resolveImg(card.thumb)"
               mode="aspectFill"
+              lazy-load="true"
             />
             <view v-else class="hot-thumb hot-thumb-placeholder">
               <text class="hot-thumb-text">{{ placeholderChar(card.item.name) }}</text>
@@ -147,9 +178,31 @@
       </view>
     </view>
 
+    <view class="section section-last" v-else-if="loading">
+      <!-- 骨架：2×2，内部行高与真实卡片一致（图占位 + 2 行标题 + 属性行 + 价格行），数据到达后楼层高度基本不变 -->
+      <view class="section-header">
+        <view class="section-title-wrap">
+          <view class="section-icon-hot"></view>
+          <text class="section-title">精选服务</text>
+        </view>
+      </view>
+      <view class="hot-grid">
+        <view class="hot-card hot-card-skeleton" v-for="n in 4" :key="n">
+          <view class="hot-thumb-skeleton"></view>
+          <view class="hot-body">
+            <view class="skeleton-line"></view>
+            <view class="skeleton-line skeleton-line-short"></view>
+            <view class="skeleton-attr"></view>
+            <view class="skeleton-price"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <!-- 空状态：所有数据都为空 -->
     <view class="home-empty" v-if="!loading && bannerList.length === 0 && categories.length === 0 && latestList.length === 0 && hotList.length === 0">
-      <text class="empty-icon">📭</text>
+      <!-- 线性图标（lucide inbox），不使用 emoji -->
+      <view class="empty-icon"></view>
       <text class="empty-text">暂无服务数据</text>
     </view>
 
@@ -550,6 +603,16 @@ const goDetail = (item: any) => {
   @include sj-icon('sparkles', 112rpx, $color-primary);
 }
 
+// 最新活动骨架块：尺寸与间距与真实卡片完全一致，仅为骨架色
+.activity-skeleton {
+  width: 440rpx;
+  height: 192rpx;
+  flex-shrink: 0;
+  border-radius: 20rpx;
+  margin-right: 20rpx;
+  background: $neutral-100;
+}
+
 // 品类宫格 swiper 分页（每页8个，4列×2行）
 .cat-swiper {
   width: 100%;
@@ -601,6 +664,18 @@ const goDetail = (item: any) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+// 品类宫格骨架：与真实图标的尺寸/位置一致，仅换为骨架色
+.cat-icon-skeleton {
+  background: $neutral-100;
+}
+
+.cat-name-skeleton {
+  width: 72rpx;
+  height: 24rpx;
+  border-radius: 6rpx;
+  background: $neutral-100;
 }
 
 // 精选服务：2 列网格
@@ -717,6 +792,45 @@ const goDetail = (item: any) => {
   color: $color-primary;
 }
 
+// 精选服务骨架：外壳复用 .hot-card（白底 + 轻阴影），仅内部占位块为骨架色，
+// 从而数据到达时卡片外框尺寸不变，避免整层跳动
+.hot-card-skeleton {
+  // 骨架不可点击，避免空白期误触进详情
+  pointer-events: none;
+}
+
+.hot-thumb-skeleton {
+  height: 224rpx;
+  background: $neutral-100;
+}
+
+// 骨架行高对齐真实卡片内部各行（标题 2 行 / 属性行 / 价格行），
+// 使数据到达时楼层高度变化控制在数像素内（验收场景 2）
+.skeleton-line {
+  height: 38rpx;
+  border-radius: 8rpx;
+  background: $neutral-100;
+}
+
+.skeleton-line-short {
+  width: 55%;
+}
+
+.skeleton-attr {
+  height: 28rpx;
+  margin-top: 8rpx;
+  border-radius: 8rpx;
+  background: $neutral-100;
+}
+
+.skeleton-price {
+  width: 40%;
+  height: 36rpx;
+  margin-top: 12rpx;
+  border-radius: 8rpx;
+  background: $neutral-100;
+}
+
 // 空状态
 .home-empty {
   display: flex;
@@ -725,8 +839,9 @@ const goDetail = (item: any) => {
   padding: 120rpx 0;
 }
 
+// 空态图标：lucide inbox 线性图标（禁止 emoji）
 .empty-icon {
-  font-size: 120rpx;
+  @include sj-icon('inbox', 120rpx, $text-light);
   margin-bottom: 24rpx;
 }
 
