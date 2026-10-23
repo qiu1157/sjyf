@@ -4,18 +4,47 @@ import { InboxOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { UploadRequestOption } from 'rc-upload/lib/interface';
 import request from '../utils/request';
 
+export type ImageUploadType = 'category-icon' | 'service-image' | 'banner-image' | 'content-image';
+
 // 后端上传接口路径（不含 /api 前缀，request baseURL 会自动拼接）
-const UPLOAD_PATHS: Record<string, string> = {
+const UPLOAD_PATHS: Record<ImageUploadType, string> = {
   'category-icon': '/admin/upload/category-icon',
   'service-image': '/admin/upload/service-image',
   'banner-image': '/admin/upload/banner-image',
   'content-image': '/admin/upload/content-image',
 };
 
+/** 同一套图片大小规则，供单图组件与批量上传复用 */
+export function getImageUploadLimit(type: ImageUploadType): number {
+  return type === 'category-icon' ? 500 * 1024 : 2 * 1024 * 1024;
+}
+
+/** 统一校验图片格式与大小，返回 null 表示通过 */
+export function validateImageFile(file: File, type: ImageUploadType): string | null {
+  const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
+  if (!isJpgOrPng) return '仅支持 JPG/PNG 格式图片';
+  const limit = getImageUploadLimit(type);
+  if (file.size > limit) {
+    const kb = Math.floor(limit / 1024);
+    return `文件大小超过限制，最大 ${kb}KB`;
+  }
+  return null;
+}
+
+/** 统一上传实现，返回后端落库后的图片地址 */
+export async function uploadImageFile(file: File, type: ImageUploadType): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await request.post(UPLOAD_PATHS[type], formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return (res as any).url;
+}
+
 interface ImageUploadProps {
   value?: string;
   onChange?: (value: string) => void;
-  type?: 'category-icon' | 'service-image' | 'banner-image' | 'content-image';
+  type?: ImageUploadType;
   hint?: string;
   /** 紧凑模式：单图方块（多图宫格列表内使用），默认 false */
   compact?: boolean;
@@ -26,15 +55,9 @@ export default function ImageUpload({ value, onChange, type = 'category-icon', h
 
   // 上传前校验：格式 + 大小
   const beforeUpload = (file: File) => {
-    const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
-    if (!isJpgOrPng) {
-      message.error('仅支持 JPG/PNG 格式图片');
-      return Upload.LIST_IGNORE;
-    }
-    const limit = type === 'category-icon' ? 500 * 1024 : 2 * 1024 * 1024;
-    if (file.size > limit) {
-      const kb = Math.floor(limit / 1024);
-      message.error(`文件大小超过限制，最大 ${kb}KB`);
+    const error = validateImageFile(file, type);
+    if (error) {
+      message.error(error);
       return Upload.LIST_IGNORE;
     }
     return true;
@@ -45,13 +68,7 @@ export default function ImageUpload({ value, onChange, type = 'category-icon', h
     const { file, onSuccess, onError } = options;
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file as File);
-      // request 拦截器已解包 data.data，res 即 {url, thumbUrl}
-      const res = await request.post(UPLOAD_PATHS[type], formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      const url = (res as any).url;
+      const url = await uploadImageFile(file as File, type);
       onChange?.(url);
       onSuccess?.({}, file as any);
       message.success('上传成功');

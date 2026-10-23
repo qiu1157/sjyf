@@ -43,7 +43,9 @@ import {
   BLOCK_TYPE_LABELS,
   BLOCK_TYPES,
   CONTENT_TEMPLATES,
+  IMAGE_CONTENT_TEMPLATE,
   MAX_BLOCKS,
+  countImages,
   createBlock,
   parseLegacyContent,
   toBlocks,
@@ -81,9 +83,11 @@ const TYPE_TAG_COLOR: Record<BlockType, string> = {
 /** 按块类型分发到对应的编辑子组件 */
 function BlockEditorSwitch({
   block,
+  totalImages,
   onChange,
 }: {
   block: ContentBlock;
+  totalImages: number;
   onChange: (next: ContentBlock) => void;
 }) {
   switch (block.type) {
@@ -92,9 +96,9 @@ function BlockEditorSwitch({
     case 'text':
       return <TextBlockEditor block={block} onChange={onChange} />;
     case 'image':
-      return <ImageBlockEditor block={block} onChange={onChange} />;
+      return <ImageBlockEditor block={block} totalImages={totalImages} onChange={onChange} />;
     case 'imageGroup':
-      return <ImageGroupBlockEditor block={block} onChange={onChange} />;
+      return <ImageGroupBlockEditor block={block} totalImages={totalImages} onChange={onChange} />;
     case 'params':
       return <ParamsBlockEditor block={block} onChange={onChange} />;
     case 'guarantee':
@@ -106,6 +110,7 @@ interface SortableBlockCardProps {
   block: ContentBlock;
   index: number;
   total: number;
+  totalImages: number;
   onChange: (next: ContentBlock) => void;
   onRemove: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
@@ -117,6 +122,7 @@ const SortableBlockCard = memo(
     block,
     index,
     total,
+    totalImages,
     onChange,
     onRemove,
     onMove,
@@ -206,14 +212,17 @@ const SortableBlockCard = memo(
           </span>
         </div>
         <div style={{ padding: 12 }}>
-          <BlockEditorSwitch block={block} onChange={onChange} />
+          <BlockEditorSwitch block={block} totalImages={totalImages} onChange={onChange} />
         </div>
       </div>
     );
   },
   // 仅当块自身或位置变化时重渲染，保证 30 块规模下输入流畅
   (prev, next) =>
-    prev.block === next.block && prev.index === next.index && prev.total === next.total,
+    prev.block === next.block &&
+    prev.index === next.index &&
+    prev.total === next.total &&
+    prev.totalImages === next.totalImages,
 );
 
 export default function ServiceContentEditor({
@@ -228,6 +237,7 @@ export default function ServiceContentEditor({
   const blocks = useMemo(() => toBlocks(value), [value]);
   const blocksRef = useRef<ContentBlock[]>(blocks);
   blocksRef.current = blocks;
+  const totalImages = useMemo(() => countImages(blocks), [blocks]);
 
   const emit = useCallback((next: ContentBlock[]) => {
     blocksRef.current = next;
@@ -316,7 +326,7 @@ export default function ServiceContentEditor({
   // US-037：套用模板（覆盖当前块，需二次确认，不自动保存）
   const applyTemplate = useCallback(
     (key: string) => {
-      const template = CONTENT_TEMPLATES.find((item) => item.key === key);
+      const template = [...CONTENT_TEMPLATES, IMAGE_CONTENT_TEMPLATE].find((item) => item.key === key);
       if (!template) return;
       Modal.confirm({
         title: `套用「${template.name}」模板？`,
@@ -359,6 +369,10 @@ export default function ServiceContentEditor({
     onClick: ({ key }: { key: string }) => applyTemplate(key),
   };
 
+  const applyImageTemplate = useCallback(() => {
+    applyTemplate(IMAGE_CONTENT_TEMPLATE.key);
+  }, [applyTemplate]);
+
   const editorPane = (
     <div>
       <Space style={{ marginBottom: 12 }} wrap>
@@ -370,8 +384,11 @@ export default function ServiceContentEditor({
         <Dropdown menu={templateMenu} trigger={['click']}>
           <Button icon={<ThunderboltOutlined />}>套用模板</Button>
         </Dropdown>
+        <Button data-testid="image-detail-template" icon={<PictureOutlined />} onClick={applyImageTemplate}>
+          图片化模板
+        </Button>
         <span style={{ fontSize: 12, color: '#9A8F86' }}>
-          共 {blocks.length} 个内容块（上限 {MAX_BLOCKS}）
+          共 {blocks.length} 个内容块（上限 {MAX_BLOCKS}），正文图 {totalImages}
         </span>
       </Space>
 
@@ -398,6 +415,7 @@ export default function ServiceContentEditor({
                 block={block}
                 index={index}
                 total={blocks.length}
+                totalImages={totalImages}
                 onChange={updateBlock}
                 onRemove={removeBlock}
                 onMove={moveBlock}

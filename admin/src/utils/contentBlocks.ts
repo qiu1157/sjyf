@@ -91,6 +91,8 @@ export interface ContentBlocksPayload {
 // 与后端 §3.3 对齐的上限（前端提前拦截，避免用户白填后被服务端拒绝）
 export const MAX_BLOCKS = 30;
 export const MAX_IMAGES = 30;
+// US-049：运营建议值，不是硬校验；用于提示图片化详情的推荐张数上限
+export const RECOMMENDED_IMAGES = 18;
 export const MAX_GROUP_IMAGES = 9;
 export const MAX_PARAM_ITEMS = 12;
 export const MAX_HEADING_LENGTH = 30;
@@ -386,7 +388,8 @@ type BlockDraft =
   | Omit<TextBlock, 'id'>
   | Omit<ImageBlock, 'id'>
   | Omit<ImageGroupBlock, 'id'>
-  | Omit<ParamsBlock, 'id'>;
+  | Omit<ParamsBlock, 'id'>
+  | Omit<GuaranteeBlock, 'id'>;
 
 /** 内部小工具：批量生成块（自动补唯一 id） */
 function buildBlocks(list: BlockDraft[]): ContentBlock[] {
@@ -476,3 +479,47 @@ export const CONTENT_TEMPLATES: ContentTemplate[] = [
       ]),
   },
 ];
+
+/** US-049：图片化详情模板，强调主视觉 + 场景图 + 结构化区分层 */
+export const IMAGE_CONTENT_TEMPLATE: ContentTemplate = {
+  key: 'image-first-detail',
+  name: '图片化详情',
+  summary: '适合家政服务的强视觉详情页骨架，先图片表达，再补结构化信息',
+  build: () =>
+    buildBlocks([
+      { type: 'heading', text: '服务亮点' },
+      { type: 'image', url: '', caption: '主视觉图（建议 4:3 或 3:4）' },
+      {
+        type: 'text',
+        text: '请在这里补充 1-3 行卖点说明，例如适用场景、服务效果或作业重点。',
+      },
+      {
+        type: 'imageGroup',
+        columns: 2,
+        images: [
+          { url: '', caption: '场景图 1' },
+          { url: '', caption: '场景图 2' },
+        ],
+      },
+      {
+        type: 'text',
+        text: '服务流程：\n1. 上门确认作业范围\n2. 分区处理重点区域\n3. 现场复核并交付说明',
+      },
+      {
+        type: 'guarantee',
+        items: [
+          { icon: 'shield-check', title: '身份核验', desc: '服务人员实名可追溯' },
+          { icon: 'badge-check', title: '标准执行', desc: '按既定流程作业' },
+          { icon: 'clock', title: '准时上门', desc: '按预约时间到场' },
+        ],
+      },
+      {
+        type: 'text',
+        text: '服务范围与不含项：\n包含：请补充本次服务包含的核心内容。\n不含：请补充不在服务范围内的项目。',
+      },
+      {
+        type: 'params',
+        items: [{ key: 'duration' }, { key: 'scope' }, { key: 'price_unit' }],
+      },
+    ]),
+};
