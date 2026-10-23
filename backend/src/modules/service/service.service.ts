@@ -96,6 +96,20 @@ export class ServiceService {
     this.applyStructuredInt(data, 'validity_days', { min: 1 }, '服务期限必须为大于 0 的整数');
   }
 
+  /**
+   * 排序值归一化：`sort` 为 NOT NULL 列，直接传 null 会触发数据库报错
+   * - 未传 → 本次不动
+   * - 空值（null / ''）→ 0，与后台表单「清空即 0」保持一致
+   * - 非「不小于 0 的整数」→ 拒绝，避免绕过界面直连接口时写入脏数据
+   */
+  private applySortField(data: Partial<ServiceItem>): void {
+    if (!('sort' in (data as any))) return;
+    const value = this.toStructuredNumber((data as any).sort);
+    const invalid = Number.isNaN(value) || (value !== null && (!Number.isInteger(value) || value < 0));
+    if (invalid) throw new BadRequestException('排序值需为不小于 0 的整数');
+    data.sort = value ?? 0;
+  }
+
   async createCategory(data: Partial<ServiceCategory>, operator?: OperatorInfo) {
     // 去除字符串字段左右空格（在唯一性校验之前执行）
     data = this.trimStringFields(data as any, ['name', 'icon', 'description']);
@@ -267,6 +281,8 @@ export class ServiceService {
     data = this.trimStringFields(data as any, ['name', 'cover_image', 'thumbnail_image', 'banner_image', 'description', 'content', 'scope', 'notice']);
     // 服务档案结构化字段校验与归一化（空值统一写 NULL）
     this.validateStructuredFields(data);
+    // 排序值归一化：空值落 0，规避 NOT NULL 列直传 null 报错（US-044 加固）
+    this.applySortField(data);
     // 块式详情：校验后双写 content_blocks（JSON 真身）与 content（HTML 快照）
     this.applyContentBlocks(data);
     // 走马灯大图校验：展示专区选「走马灯海报」(1) 时 banner_image 必填
@@ -295,6 +311,8 @@ export class ServiceService {
     data = this.trimStringFields(data as any, ['name', 'cover_image', 'thumbnail_image', 'banner_image', 'description', 'content', 'scope', 'notice']);
     // 服务档案结构化字段校验与归一化（空值统一写 NULL）
     this.validateStructuredFields(data);
+    // 排序值归一化：空值落 0，规避 NOT NULL 列直传 null 报错（US-044 加固）
+    this.applySortField(data);
     // 块式详情：传了块数据则双写；未传 / null / 空数组视为本次不动，保留旧 content 快照
     this.applyContentBlocks(data);
     const before = await this.itemRepo.findOne({ where: { id, is_deleted: 0 } });
