@@ -22,6 +22,16 @@ export class ServiceItem {
   @Column({ type: 'text', nullable: true }) content_blocks: string;
   @Column({ length: 512, nullable: true }) scope: string;
   @Column({ length: 512, nullable: true }) notice: string;
+  // 服务方式：1 上门服务 / 2 到店服务 / 3 上门或到店均可（空=未填写）
+  @Column({ type: 'int', nullable: true }) service_mode: number;
+  // 服务人数上限（人），空=不限
+  @Column({ type: 'int', nullable: true }) people_count: number;
+  // 适用面积上限（㎡），空=不限
+  @Column({ type: 'int', nullable: true }) area_max: number;
+  // 计价方式：1 按次一口价 / 2 按小时计费 / 3 按平方米计费 / 4 按人天计费 / 5 面议（空=面议）
+  @Column({ type: 'int', nullable: true }) price_unit: number;
+  // 服务期限（下单后 N 天内有效），空=长期有效
+  @Column({ type: 'int', nullable: true }) validity_days: number;
   @Column({ type: 'int', default: 0 }) sort: number;
   @Column({ type: 'int', default: 1 }) status: number;
   @Column({ type: 'int', default: 1 }) show_user: number;

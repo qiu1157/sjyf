@@ -8,6 +8,14 @@ interface RequestOptions {
   silent401?: boolean;
 }
 
+// 服务详情：服务端派生的结构化渲染数据（US-038）
+export interface DetailSectionParam { label: string; value: string }
+export interface DetailSections { has_structured_content: boolean; params: DetailSectionParam[] }
+export interface ServiceDetail {
+  [key: string]: any;
+  detail_sections?: DetailSections;
+}
+
 export function request<T = any>(options: RequestOptions): Promise<T> {
   return new Promise((resolve, reject) => {
     const token = uni.getStorageSync('token');
@@ -79,7 +87,7 @@ export const api = {
   // 服务
   categories: () => request({ url: '/services/categories', noAuth: true }),
   serviceList: (params?: any) => request({ url: '/services/items', data: params, noAuth: true }),
-  serviceDetail: (id: number) => request({ url: `/services/items/${id}`, noAuth: true }),
+  serviceDetail: (id: number) => request<ServiceDetail>({ url: `/services/items/${id}`, noAuth: true }),
   banner: () => request({ url: '/services/banner', noAuth: true }),
   latest: () => request({ url: '/services/latest', noAuth: true }),
   hot: () => request({ url: '/services/hot', noAuth: true }),

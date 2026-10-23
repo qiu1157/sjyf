@@ -9,6 +9,7 @@ import {
   renderBlocksToHtml,
   parseStoredBlocks,
   summarizeBlocks,
+  buildDetailSections,
 } from './content-blocks.util';
 
 @Injectable()
@@ -49,6 +50,50 @@ export class ServiceService {
     data.content_blocks = JSON.stringify(payload);
     data.content = renderBlocksToHtml(payload);
     return true;
+  }
+
+  /** 结构化数字归一化：'' / null / 空 → null（清空）；数字或数字字符串 → 数值；其余 → NaN（非法，交调用方抛错） */
+  private toStructuredNumber(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string') {
+      const text = value.trim();
+      return text === '' ? null : Number(text);
+    }
+    if (typeof value === 'number') return value;
+    return NaN;
+  }
+
+  /** 校验单个整数字段：undefined（本次未传）跳过；空值归一化为 null（清空）；非整数 / 越界抛错 */
+  private applyStructuredInt(
+    data: Partial<ServiceItem>,
+    field: 'service_mode' | 'people_count' | 'area_max' | 'price_unit' | 'validity_days',
+    range: { min: number; max?: number },
+    message: string,
+  ): void {
+    const raw = (data as any)[field];
+    if (raw === undefined) return;
+    const num = this.toStructuredNumber(raw);
+    if (num === null) {
+      (data as any)[field] = null;
+      return;
+    }
+    const outOfRange = !Number.isInteger(num) || num < range.min || (range.max !== undefined && num > range.max);
+    if (outOfRange) throw new BadRequestException(message);
+    (data as any)[field] = num;
+  }
+
+  /**
+   * 服务档案结构化字段校验与归一化（US-038）
+   * - service_mode / price_unit 为枚举取值校验
+   * - people_count / area_max / validity_days 为正整数校验
+   * - 空值统一写为 NULL（而非 0 或 ''），保证「未填写」语义可辨认
+   */
+  private validateStructuredFields(data: Partial<ServiceItem>): void {
+    this.applyStructuredInt(data, 'service_mode', { min: 1, max: 3 }, '服务方式取值不正确（应为 1 上门服务 / 2 到店服务 / 3 上门或到店均可）');
+    this.applyStructuredInt(data, 'price_unit', { min: 1, max: 5 }, '计价方式取值不正确（应为 1~5）');
+    this.applyStructuredInt(data, 'people_count', { min: 1 }, '服务人数必须为大于 0 的整数');
+    this.applyStructuredInt(data, 'area_max', { min: 1 }, '适用面积必须为大于 0 的整数');
+    this.applyStructuredInt(data, 'validity_days', { min: 1 }, '服务期限必须为大于 0 的整数');
   }
 
   async createCategory(data: Partial<ServiceCategory>, operator?: OperatorInfo) {
@@ -188,6 +233,8 @@ export class ServiceService {
     // 公开接口不暴露内部编辑数据 content_blocks，只返回 content 快照
     const result: Record<string, any> = { ...item };
     delete result.content_blocks;
+    // 派生只读渲染视图：小程序端据此原生渲染参数表
+    result.detail_sections = buildDetailSections(item);
     return result;
   }
 
@@ -202,6 +249,8 @@ export class ServiceService {
   async createItem(data: Partial<ServiceItem>, operator?: OperatorInfo) {
     // 去除字符串字段左右空格（在唯一性校验之前执行）
     data = this.trimStringFields(data as any, ['name', 'cover_image', 'thumbnail_image', 'banner_image', 'description', 'content', 'scope', 'notice']);
+    // 服务档案结构化字段校验与归一化（空值统一写 NULL）
+    this.validateStructuredFields(data);
     // 块式详情：校验后双写 content_blocks（JSON 真身）与 content（HTML 快照）
     this.applyContentBlocks(data);
     // 走马灯大图校验：展示专区选「走马灯海报」(1) 时 banner_image 必填
@@ -228,6 +277,8 @@ export class ServiceService {
   async updateItem(id: number, data: Partial<ServiceItem>, operator?: OperatorInfo) {
     // 去除字符串字段左右空格（在唯一性校验之前执行）
     data = this.trimStringFields(data as any, ['name', 'cover_image', 'thumbnail_image', 'banner_image', 'description', 'content', 'scope', 'notice']);
+    // 服务档案结构化字段校验与归一化（空值统一写 NULL）
+    this.validateStructuredFields(data);
     // 块式详情：传了块数据则双写；未传 / null / 空数组视为本次不动，保留旧 content 快照
     this.applyContentBlocks(data);
     const before = await this.itemRepo.findOne({ where: { id, is_deleted: 0 } });

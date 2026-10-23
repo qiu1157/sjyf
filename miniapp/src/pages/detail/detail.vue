@@ -38,7 +38,11 @@
             <text v-if="hasPromo" class="price-promo">¥{{ detail.promo_price }}</text>
             <text :class="['price', { 'price-origin': hasPromo }]">¥{{ detail.price }}</text>
           </view>
-          <view class="mini muted mt-sm">服务时长 {{ detail.duration }} 分钟</view>
+          <view class="price-meta mt-sm">
+            <view class="mini muted">服务时长 {{ detail.duration }} 分钟</view>
+            <!-- 服务方式标签（US-038）：仅当服务端返回有效枚举值时才展示 -->
+            <view v-if="serviceModeLabel" class="mode-tag">{{ serviceModeLabel }}</view>
+          </view>
         </view>
       </view>
 
@@ -55,6 +59,23 @@
             selectable
           />
           <view v-else class="mini muted">暂无详细说明</view>
+        </view>
+      </view>
+
+      <!-- 服务参数（US-038）：仅存量服务无派生数据时不展示，顺序与空值兜底均由服务端处理 -->
+      <view v-if="params.length > 0" class="section mx-base">
+        <view class="section-title mb-md">服务参数</view>
+        <view class="card card-padding">
+          <view class="param-table">
+            <view
+              v-for="(item, index) in params"
+              :key="index"
+              :class="['param-row', { 'param-row-last': index === params.length - 1 }]"
+            >
+              <view class="param-label">{{ item.label }}</view>
+              <view class="param-value">{{ item.value }}</view>
+            </view>
+          </view>
         </view>
       </view>
 
@@ -112,6 +133,17 @@ const contentHtml = computed(() => {
   const raw = detail.value?.content;
   if (!raw) return '';
   return raw.includes('<') ? raw : raw.replace(/\n/g, '<br/>');
+});
+
+// 服务端派生的结构化渲染数据（US-038）；存量服务无此字段
+const detailSections = computed(() => detail.value?.detail_sections ?? null);
+// 服务参数表（顺序与文案由服务端派生，前端只渲染）
+const params = computed(() => detailSections.value?.params ?? []);
+// 服务方式标签文案（US-038）：1 上门 / 2 到店 / 3 上门或到店
+const serviceModeLabel = computed(() => {
+  const map: Record<number, string> = { 1: '上门服务', 2: '到店服务', 3: '上门/到店均可' };
+  const mode = Number(detail.value?.service_mode);
+  return map[mode] || '';
 });
 
 // 页面加载：接收 id 参数并拉取服务详情
@@ -273,6 +305,54 @@ const goBook = async () => {
   font-size: $font-size-sm;
   line-height: 1.8;
   color: $text-body;
+}
+
+// 价格卡片辅助信息行：服务时长与「服务方式」胶囊标签并排
+.price-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.mode-tag {
+  padding: 2px 10px;
+  background: $bg-tag-brown;
+  color: $color-primary;
+  border-radius: $radius-round;
+  font-size: $font-size-xs;
+}
+
+// 服务参数表：左列标签固定比例浅底，右列取值自适应撑满
+.param-table {
+  border-radius: $radius-sm;
+  overflow: hidden;
+}
+
+.param-row {
+  display: flex;
+  align-items: stretch;
+  font-size: $font-size-sm;
+  border-bottom: 1px solid $line-light;
+}
+
+// 末行去掉分隔线，避免与卡片底边重复
+.param-row-last {
+  border-bottom: none;
+}
+
+.param-label {
+  width: 38%;
+  padding: 8px 10px;
+  background: $bg-paper-soft;
+  color: $text-secondary;
+}
+
+.param-value {
+  flex: 1;
+  padding: 8px 10px;
+  color: $text-primary;
+  word-break: break-all;
 }
 
 // 下架/不存在提示页

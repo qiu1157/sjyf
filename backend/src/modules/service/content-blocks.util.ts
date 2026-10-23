@@ -51,6 +51,10 @@ export interface ContentBlocksPayload {
   blocks: ContentBlock[];
 }
 
+// 结构化块类型白名单（本期仅参数表 params）：此类块不进 HTML 快照，改由公开详情的 detail_sections 原生渲染，避免重复
+export const STRUCTURED_BLOCK_TYPES = ['params'] as const;
+const STRUCTURED_BLOCK_TYPE_SET: ReadonlySet<BlockType> = new Set(STRUCTURED_BLOCK_TYPES);
+
 // 约束上限（与 spec §3.3 保持一致）
 const MAX_BLOCKS = 30;
 const MAX_IMAGES = 30;
@@ -187,6 +191,8 @@ export function renderBlocksToHtml(payload: ContentBlocksPayload): string {
   const parts: string[] = [];
 
   for (const block of payload.blocks) {
+    // 结构化块（如参数表）不进 HTML 快照：由公开详情接口的 detail_sections 原生渲染，避免重复展示
+    if (STRUCTURED_BLOCK_TYPE_SET.has(block.type)) continue;
     switch (block.type) {
       case 'heading':
         parts.push(
@@ -271,4 +277,102 @@ export function summarizeBlocks(raw: unknown): { blocks_count: number; block_typ
     blocks_count: payload.blocks.length,
     block_types: Array.from(new Set(payload.blocks.map((block) => block.type))),
   };
+}
+
+// ============ 服务档案结构化（US-038：detail_sections 派生投影） ============
+
+/** 服务方式枚举文案 */
+export const SERVICE_MODE_LABELS: Record<number, string> = {
+  1: '上门服务',
+  2: '到店服务',
+  3: '上门/到店均可',
+};
+
+/** 计价方式枚举文案 */
+export const PRICE_UNIT_LABELS: Record<number, string> = {
+  1: '按次一口价',
+  2: '按小时计费',
+  3: '按平方米计费',
+  4: '按人天计费',
+  5: '面议',
+};
+
+/** detail_sections 单行参数 */
+export interface DetailSectionParam {
+  label: string;
+  value: string;
+}
+
+/** 只读渲染视图：小程序原生渲染参数表用 */
+export interface DetailSections {
+  has_structured_content: boolean;
+  params: DetailSectionParam[];
+}
+
+/** 结构化字段来源（宽松接口，避免 import 实体造成循环依赖） */
+export interface StructuredFieldSource {
+  duration?: number | string | null;
+  people_count?: number | string | null;
+  area_max?: number | string | null;
+  price_unit?: number | string | null;
+  scope?: string | null;
+  validity_days?: number | string | null;
+  service_mode?: number | string | null;
+  content_blocks?: unknown;
+}
+
+/** 弱类型数字转「正数」：字符串数字可识别；非数字 / ≤0 / 空 一律视为未填写（null） */
+function toPositiveNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const num = typeof value === 'number' ? value : Number(String(value).trim());
+  if (!Number.isFinite(num) || num <= 0) return null;
+  return num;
+}
+
+/** 已落库块数据中是否含结构化块（如参数表） */
+function hasStructuredContentBlock(raw: unknown): boolean {
+  const payload = parseStoredBlocks(raw);
+  if (!payload) return false;
+  return payload.blocks.some((block) => STRUCTURED_BLOCK_TYPE_SET.has(block.type));
+}
+
+/**
+ * 由服务档案派生只读渲染视图 detail_sections（纯计算，不抛错）
+ * - has_structured_content：结构化字段任一有值，或 content_blocks 含结构化块；
+ *   注意 legacy 字段 duration / scope 单独有值不算（保证存量服务零回归）
+ * - 为 false 时 params 恒为 []
+ * - 为 true 时按固定顺序输出：服务时长 → 服务人数 → 适用面积 → 计价方式 → 服务地域 → 服务期限
+ */
+export function buildDetailSections(item: StructuredFieldSource): DetailSections {
+  const duration = toPositiveNumber(item.duration);
+  const peopleCount = toPositiveNumber(item.people_count);
+  const areaMax = toPositiveNumber(item.area_max);
+  const priceUnit = toPositiveNumber(item.price_unit);
+  const validityDays = toPositiveNumber(item.validity_days);
+  const serviceMode = toPositiveNumber(item.service_mode);
+  const scope = typeof item.scope === 'string' ? item.scope.trim() : '';
+
+  const hasStructuredField =
+    serviceMode !== null ||
+    peopleCount !== null ||
+    areaMax !== null ||
+    priceUnit !== null ||
+    validityDays !== null;
+  if (!hasStructuredField && !hasStructuredContentBlock(item.content_blocks)) {
+    return { has_structured_content: false, params: [] };
+  }
+
+  const params: DetailSectionParam[] = [];
+  // 服务时长：无条件行（duration 默认 60），为空/0 时跳过整行
+  if (duration !== null) {
+    const durationText = duration >= 60 && duration % 60 === 0 ? `${duration / 60} 小时` : `${duration} 分钟`;
+    params.push({ label: '服务时长', value: durationText });
+  }
+  params.push({ label: '服务人数', value: peopleCount !== null ? `最多 ${peopleCount} 人` : '不限' });
+  params.push({ label: '适用面积', value: areaMax !== null ? `${areaMax}㎡ 以内` : '不限' });
+  params.push({ label: '计价方式', value: priceUnit !== null ? PRICE_UNIT_LABELS[priceUnit] || '面议' : '面议' });
+  params.push({ label: '服务地域', value: scope || '到店咨询' });
+  params.push({ label: '服务期限', value: validityDays !== null ? `下单后 ${validityDays} 天内有效` : '长期有效' });
+
+  return { has_structured_content: true, params };
 }

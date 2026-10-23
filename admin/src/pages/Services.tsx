@@ -27,7 +27,17 @@ export default function Services() {
     setEditing(row);
     form.resetFields();
     if (row) {
-      form.setFieldsValue(row);
+      // 接口返回的 content_blocks 是 JSON 字符串，需先解析为对象再回填；
+      // 否则表单校验器拿不到 blocks 数组，编辑已有服务时会误报「请至少添加一个内容块」
+      let contentBlocks = row.content_blocks;
+      if (typeof contentBlocks === 'string') {
+        try {
+          contentBlocks = JSON.parse(contentBlocks);
+        } catch {
+          contentBlocks = null;
+        }
+      }
+      form.setFieldsValue({ ...row, content_blocks: contentBlocks });
     } else {
       form.setFieldsValue({ display_zone: 0, status: 0 });
     }
@@ -195,99 +205,146 @@ export default function Services() {
           pageSizeOptions: [10, 20, 50, 100],
         }}
       />
-      <Modal title={editing ? '编辑服务' : '新增服务'} open={modal} onCancel={() => setModal(false)} onOk={submit} width={1100} destroyOnClose>
+      <Modal
+        title={editing ? '编辑服务' : '新增服务'}
+        open={modal}
+        onCancel={() => setModal(false)}
+        onOk={submit}
+        width={1100}
+        destroyOnClose
+        styles={{ body: { maxHeight: '72vh', overflowY: 'auto', paddingRight: 8 } }}
+      >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="服务标题" rules={[
-            { required: true, message: '请输入服务标题' },
-            { max: 50, message: '标题不超过 50 字符' },
-          ]}>
-            <Input placeholder="1-50 字符" />
-          </Form.Item>
-
-          <Form.Item name="category_id" label="所属品类" rules={[{ required: true, message: '请选择品类' }]}>
-            <Select placeholder="请选择" options={cats.map(c => ({ value: c.id, label: c.name }))} />
-          </Form.Item>
-
-          <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item name="price" label="价格(元)" rules={[
-              { required: true, message: '请输入价格' },
-              {
-                validator: (_, val) => val > 0 ? Promise.resolve() : Promise.reject(new Error('价格必须大于 0')),
-              },
-            ]} style={{ flex: 1 }}>
-              <InputNumber min={0} precision={2} style={{ width: '100%' }} placeholder=">0，2位小数" />
-            </Form.Item>
-            <Form.Item name="promo_price" label="促销价(元)" rules={[
-              {
-                validator: (_, val) => {
-                  if (val == null || val === '') return Promise.resolve();
-                  const price = form.getFieldValue('price');
-                  if (val <= 0) return Promise.reject(new Error('促销价必须大于 0'));
-                  if (price && val >= price) return Promise.reject(new Error('促销价必须小于价格'));
-                  return Promise.resolve();
-                },
-              },
-            ]} style={{ flex: 1 }}>
-              <InputNumber precision={2} style={{ width: '100%' }} placeholder="选填，须小于价格" />
-            </Form.Item>
-          </div>
-
-          <Form.Item name="cover_image" label="服务封面图" rules={[{ required: true, message: '请上传封面图' }]}>
-            <ImageUpload type="service-image" hint="JPG/PNG，≤2MB，推荐 400×300" />
-          </Form.Item>
-
-          <Form.Item name="status" label="是否上架" rules={[{ required: true }]}>
-            <Radio.Group>
-              <Radio value={1}>是</Radio>
-              <Radio value={0}>否</Radio>
-            </Radio.Group>
-          </Form.Item>
-
-          <Form.Item name="display_zone" label="展示专区" rules={[{ required: true }]}>
-            <Radio.Group>
-              <Radio value={0}>无</Radio>
-              <Radio value={1}>走马灯海报</Radio>
-              <Radio value={2}>最新活动</Radio>
-              <Radio value={3}>热销专区</Radio>
-            </Radio.Group>
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.display_zone !== cur.display_zone}>
-            {({ getFieldValue }) => getFieldValue('display_zone') === 1 ? (
-              <Form.Item name="banner_image" label="走马灯大图" rules={[
-                { required: true, message: '请上传走马灯大图' },
-              ]}>
-                <ImageUpload type="service-image" hint="JPG/PNG，≤2MB，推荐 750×350" />
+          {/* ① 服务档案：结构化档案字段，7 项 */}
+          <Card size="small" title="服务档案" style={{ marginBottom: 16, borderColor: colors.neutral200 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+              <Form.Item name="service_mode" label="服务方式" style={{ marginBottom: 0 }}>
+                <Select allowClear placeholder="请选择" options={[
+                  { value: 1, label: '上门服务' },
+                  { value: 2, label: '到店服务' },
+                  { value: 3, label: '上门/到店均可' },
+                ]} />
               </Form.Item>
-            ) : null}
-          </Form.Item>
+              <Form.Item name="duration" label="服务时长(分钟)" rules={[{ required: true, message: '请输入时长' }]} style={{ marginBottom: 0 }}>
+                <InputNumber min={1} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="people_count" label="服务人数(人)" style={{ marginBottom: 0 }}>
+                <InputNumber min={1} style={{ width: '100%' }} placeholder="空=不限" />
+              </Form.Item>
+              <Form.Item name="area_max" label="适用面积(㎡)" style={{ marginBottom: 0 }}>
+                <InputNumber min={1} style={{ width: '100%' }} placeholder="空=不限" />
+              </Form.Item>
+              <Form.Item name="price_unit" label="计价方式" style={{ marginBottom: 0 }}>
+                <Select allowClear placeholder="请选择" options={[
+                  { value: 1, label: '按次一口价' },
+                  { value: 2, label: '按小时计费' },
+                  { value: 3, label: '按平方米计费' },
+                  { value: 4, label: '按人天计费' },
+                  { value: 5, label: '面议' },
+                ]} />
+              </Form.Item>
+              <Form.Item name="scope" label="服务地域" style={{ marginBottom: 0 }}>
+                <Input placeholder="如：朝阳区 / 全城，空=到店咨询" maxLength={512} />
+              </Form.Item>
+              <Form.Item name="validity_days" label="服务期限(天)" style={{ marginBottom: 0 }}>
+                <InputNumber min={1} style={{ width: '100%' }} placeholder="空=长期有效" />
+              </Form.Item>
+            </div>
+          </Card>
 
-          <Form.Item name="duration" label="服务时长(分钟)" rules={[{ required: true, message: '请输入时长' }]}>
-            <InputNumber min={1} style={{ width: '100%' }} />
-          </Form.Item>
+          {/* ② 详情编排：标题、简介、结构化详情 */}
+          <Card size="small" title="详情编排" style={{ marginBottom: 16, borderColor: colors.neutral200 }}>
+            <Form.Item name="name" label="服务标题" rules={[
+              { required: true, message: '请输入服务标题' },
+              { max: 50, message: '标题不超过 50 字符' },
+            ]}>
+              <Input placeholder="1-50 字符" />
+            </Form.Item>
 
-          <Form.Item name="description" label="服务简介" rules={[
-            { required: true, message: '请输入简介' },
-            { max: 500, message: '简介不超过 500 字符' },
-          ]}>
-            <Input.TextArea rows={2} placeholder="1-500 字符" showCount maxLength={500} />
-          </Form.Item>
+            <Form.Item name="description" label="服务简介" rules={[
+              { required: true, message: '请输入简介' },
+              { max: 500, message: '简介不超过 500 字符' },
+            ]}>
+              <Input.TextArea rows={2} placeholder="1-500 字符" showCount maxLength={500} />
+            </Form.Item>
 
-          <Form.Item
-            name="content_blocks"
-            label="详情说明"
-            rules={[
-              { required: true, message: '请至少添加一个内容块' },
-              {
-                // 空块数组是合法对象，required 拦不住，需显式校验
-                validator: (_, val) =>
-                  val && Array.isArray(val.blocks) && val.blocks.length > 0
-                    ? Promise.resolve()
-                    : Promise.reject(new Error('请至少添加一个内容块')),
-              },
-            ]}
-          >
-            <ServiceContentEditor legacyContent={editing?.content} />
-          </Form.Item>
+            <Form.Item
+              name="content_blocks"
+              label="详情说明"
+              rules={[
+                { required: true, message: '请至少添加一个内容块' },
+                {
+                  // 空块数组是合法对象，required 拦不住，需显式校验
+                  validator: (_, val) =>
+                    val && Array.isArray(val.blocks) && val.blocks.length > 0
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('请至少添加一个内容块')),
+                },
+              ]}
+            >
+              <ServiceContentEditor legacyContent={editing?.content} />
+            </Form.Item>
+          </Card>
+
+          {/* ③ 运营投放：品类、价格、图片、专区、上架状态 */}
+          <Card size="small" title="运营投放" style={{ borderColor: colors.neutral200 }}>
+            <Form.Item name="category_id" label="所属品类" rules={[{ required: true, message: '请选择品类' }]}>
+              <Select placeholder="请选择" options={cats.map(c => ({ value: c.id, label: c.name }))} />
+            </Form.Item>
+
+            <div style={{ display: 'flex', gap: 16 }}>
+              <Form.Item name="price" label="价格(元)" rules={[
+                { required: true, message: '请输入价格' },
+                {
+                  validator: (_, val) => val > 0 ? Promise.resolve() : Promise.reject(new Error('价格必须大于 0')),
+                },
+              ]} style={{ flex: 1 }}>
+                <InputNumber min={0} precision={2} style={{ width: '100%' }} placeholder=">0，2位小数" />
+              </Form.Item>
+              <Form.Item name="promo_price" label="促销价(元)" rules={[
+                {
+                  validator: (_, val) => {
+                    if (val == null || val === '') return Promise.resolve();
+                    const price = form.getFieldValue('price');
+                    if (val <= 0) return Promise.reject(new Error('促销价必须大于 0'));
+                    if (price && val >= price) return Promise.reject(new Error('促销价必须小于价格'));
+                    return Promise.resolve();
+                  },
+                },
+              ]} style={{ flex: 1 }}>
+                <InputNumber precision={2} style={{ width: '100%' }} placeholder="选填，须小于价格" />
+              </Form.Item>
+            </div>
+
+            <Form.Item name="cover_image" label="服务封面图" rules={[{ required: true, message: '请上传封面图' }]}>
+              <ImageUpload type="service-image" hint="JPG/PNG，≤2MB，推荐 400×300" />
+            </Form.Item>
+
+            <Form.Item name="display_zone" label="展示专区" rules={[{ required: true }]}>
+              <Radio.Group>
+                <Radio value={0}>无</Radio>
+                <Radio value={1}>走马灯海报</Radio>
+                <Radio value={2}>最新活动</Radio>
+                <Radio value={3}>热销专区</Radio>
+              </Radio.Group>
+            </Form.Item>
+            <Form.Item noStyle shouldUpdate={(prev, cur) => prev.display_zone !== cur.display_zone}>
+              {({ getFieldValue }) => getFieldValue('display_zone') === 1 ? (
+                <Form.Item name="banner_image" label="走马灯大图" rules={[
+                  { required: true, message: '请上传走马灯大图' },
+                ]}>
+                  <ImageUpload type="service-image" hint="JPG/PNG，≤2MB，推荐 750×350" />
+                </Form.Item>
+              ) : null}
+            </Form.Item>
+
+            <Form.Item name="status" label="是否上架" rules={[{ required: true }]}>
+              <Radio.Group>
+                <Radio value={1}>是</Radio>
+                <Radio value={0}>否</Radio>
+              </Radio.Group>
+            </Form.Item>
+          </Card>
         </Form>
       </Modal>
     </Card>
