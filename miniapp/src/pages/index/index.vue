@@ -1,27 +1,41 @@
 <template>
   <view class="home">
     <!-- 第一层：走马灯海报 -->
-    <swiper
-      v-if="bannerList.length > 0"
-      class="banner-swiper"
-      :indicator-dots="true"
-      :autoplay="true"
-      :interval="3500"
-      :duration="500"
-      :circular="true"
-      indicator-color="var(--token-banner-indicator)"
-      indicator-active-color="var(--token-banner-indicator-active)"
-    >
-      <swiper-item v-for="item in bannerList" :key="item.id" @click="goDetail(item)">
-        <view class="banner-item">
-          <image
-            class="banner-image"
-            :src="resolveImg(item.banner_image || item.cover_image)"
-            mode="aspectFill"
-          />
-        </view>
-      </swiper-item>
-    </swiper>
+    <view class="banner-wrap" v-if="bannerSlides.length > 0">
+      <swiper
+        class="banner-swiper"
+        :indicator-dots="false"
+        :autoplay="autoPlaying"
+        :interval="5000"
+        :duration="500"
+        :circular="true"
+        @change="onBannerChange"
+        @touchstart="onBannerTouchStart"
+        @touchend="onBannerTouchEnd"
+      >
+        <swiper-item v-for="item in bannerSlides" :key="item.id" @click="goDetail(item)">
+          <view class="banner-item">
+            <image
+              class="banner-image"
+              :src="resolveImg(item.banner_image || item.cover_image)"
+              mode="aspectFill"
+            />
+          </view>
+        </swiper-item>
+      </swiper>
+      <!-- 原生指示点在小程序/H5 双端表现不一致，故自绘；外层 pointer-events 置空以免挡住海报点击 -->
+      <view class="banner-indicator">
+        <view
+          v-for="(item, idx) in bannerSlides"
+          :key="item.id"
+          class="banner-indicator-item"
+          :class="{ 'banner-indicator-item-active': idx === activeBannerIndex }"
+        ></view>
+      </view>
+    </view>
+
+    <!-- 走马灯骨架：尺寸与真实走马灯完全一致，避免加载完成时的布局跳动 -->
+    <view class="banner-skeleton" v-else-if="loading"></view>
 
     <!-- 第二层：服务品类宫格 -->
     <view class="section" v-if="categories.length > 0">
@@ -145,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import { onPullDownRefresh } from '@dcloudio/uni-app';
 import { resolveAssetUrl } from '../../utils/config';
 import { api } from '../../utils/request';
@@ -155,6 +169,56 @@ const categories = ref<any[]>([]);
 const latestList = ref<any[]>([]);
 const hotList = ref<any[]>([]);
 const loading = ref(false);
+
+// 走马灯楼层上限 5 张，超出部分运营打标也不展示
+const bannerSlides = computed(() => bannerList.value.slice(0, 5));
+const bannerCurrent = ref(0);
+// circular 循环时 current 会回绕，取模避免高亮落到不存在的下标
+const activeBannerIndex = computed(() => {
+  return bannerSlides.value.length ? bannerCurrent.value % bannerSlides.value.length : 0;
+});
+
+const onBannerChange = (e: any) => {
+  bannerCurrent.value = e?.detail?.current ?? 0;
+};
+
+// H5 端尊重系统「减少动态效果」偏好；微信端不受影响
+const detectReducedMotion = () => {
+  // #ifdef H5
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+  // #endif
+  return false;
+};
+
+const reducedMotion = detectReducedMotion();
+const autoPlaying = ref(!reducedMotion);
+let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+
+const clearResumeTimer = () => {
+  if (resumeTimer !== null) {
+    clearTimeout(resumeTimer);
+    resumeTimer = null;
+  }
+};
+
+// 按住海报即暂停：用户想停下来细看时不再被自动切换打断
+const onBannerTouchStart = () => {
+  clearResumeTimer();
+  autoPlaying.value = false;
+};
+
+// 松手延时恢复；重复触发先清掉上一个定时器，避免「松手后又被旧定时器提前恢复」
+const onBannerTouchEnd = () => {
+  clearResumeTimer();
+  resumeTimer = setTimeout(() => {
+    autoPlaying.value = !reducedMotion;
+    resumeTimer = null;
+  }, 2000);
+};
+
+onUnmounted(clearResumeTimer);
 
 const categoryPages = computed(() => {
   const pages: any[][] = [];
@@ -231,9 +295,52 @@ const goDetail = (item: any) => {
 }
 
 // 走马灯
-.banner-swiper {
-  width: 100%;
-  height: 360rpx;
+// 外层仅提供绝对定位参照，尺寸与留白交给 swiper 本身
+.banner-wrap {
+  position: relative;
+}
+
+.banner-swiper,
+.banner-skeleton {
+  // 左右 32rpx 与下方 .section 的 40rpx 32rpx 栅格左边缘对齐；顶部 24rpx 保持页面节奏
+  margin: 24rpx 32rpx 0;
+  height: 320rpx;
+  border-radius: 24rpx;
+  overflow: hidden;
+}
+
+.banner-skeleton {
+  background: $neutral-100;
+}
+
+// 自绘指示器：底部居中，深色半透明底保证指示条对比度（WCAG 1.4.11 AA）
+.banner-indicator {
+  position: absolute;
+  left: 50%;
+  bottom: 24rpx;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(32, 26, 19, 0.55);
+  // 不拦截触摸，海报仍可整块点击进详情
+  pointer-events: none;
+}
+
+.banner-indicator-item {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.banner-indicator-item-active {
+  width: 32rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: $neutral-0;
 }
 
 .banner-item {
