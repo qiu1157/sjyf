@@ -1,0 +1,38 @@
+// ==========================================
+// 拾家有方 · 小程序图标体系（单一来源，lucide）
+// ==========================================
+// 设计决策：图标一律使用 lucide，禁止 emoji（spec 附录 B / §20 全局约定第 2 条）。
+// 实现方式：把 lucide 官方 24×24 stroke 风格路径编码为 base64 SVG data-URI，
+//          经 CSS mask 作为「形状」，颜色由 background-color 在 SCSS 层传参。
+// 优点：不引入任何新依赖（无字体、无 npm 包），微信 + H5 双端可用。
+@use 'sass:map';
+
+// 图标名 -> base64 SVG data-URI（stroke 固定为 #000，仅作 alpha 形状，真实颜色由 mask 下方的背景色决定）
+$sj-icons: (
+  badge-percent:
+    'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMy44NSA4LjYyYTQgNCAwIDAgMSA0Ljc4LTQuNzcgNCA0IDAgMCAxIDYuNzQgMCA0IDQgMCAwIDEgNC43OCA0Ljc4IDQgNCAwIDAgMSAwIDYuNzQgNCA0IDAgMCAxLTQuNzcgNC43OCA0IDQgMCAwIDEtNi43NSAwIDQgNCAwIDAgMS00Ljc4LTQuNzcgNCA0IDAgMCAxIDAtNi43NloiLz48cGF0aCBkPSJtMTUgOS02IDYiLz48Y2lyY2xlIGN4PSI5IiBjeT0iOSIgcj0iMSIvPjxjaXJjbGUgY3g9IjE1IiBjeT0iMTUiIHI9IjEiLz48L3N2Zz4=',
+  flame:
+    'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNOC41IDE0LjVBMi41IDIuNSAwIDAgMCAxMSAxMmMwLTEuMzgtLjUtMi0xLTMtMS4wNzItMi4xNDMtLjIyNC00LjA1NCAyLTYgLjUgMi41IDIgNC45IDQgNi41IDIgMS42IDMgMy41IDMgNS41YTcgNyAwIDEgMS0xNCAwYzAtMS4xNTMuNDMzLTIuMjk0IDEtM2EyLjUgMi41IDAgMCAwIDIuNSAyLjV6Ii8+PC9zdmc+',
+  sparkles:
+    'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNOS45MzcgMTUuNUEyIDIgMCAwIDAgOC41IDE0LjA2M2wtNi4xMzUtMS41ODJhLjUuNSAwIDAgMSAwLS45NjJMOC41IDkuOTM2QTIgMiAwIDAgMCA5LjkzNyA4LjVsMS41ODItNi4xMzVhLjUuNSAwIDAgMSAuOTYzIDBMMTQuMDYzIDguNUEyIDIgMCAwIDAgMTUuNSA5LjkzN2w2LjEzNSAxLjU4MWEuNS41IDAgMCAxIDAgLjk2NEwxNS41IDE0LjA2M2EyIDIgMCAwIDAtMS40MzcgMS40MzdsLTEuNTgyIDYuMTM1YS41LjUgMCAwIDEtLjk2MyAweiIvPjxwYXRoIGQ9Ik0yMCAzdjQiLz48cGF0aCBkPSJNMjIgNWgtNCIvPjxwYXRoIGQ9Ik00IDE3djIiLz48cGF0aCBkPSJNNSAxOEgzIi8+PC9zdmc+',
+);
+
+// 用法：.section-icon { @include sj-icon('badge-percent', 32rpx, $color-primary); }
+// $name  图标名（须存在于 $sj-icons）
+// $size  尺寸（宽高一致，默认 32rpx）
+// $color 颜色（默认继承 currentColor）
+@mixin sj-icon($name, $size: 32rpx, $color: currentColor) {
+  display: inline-block;
+  width: $size;
+  height: $size;
+  flex-shrink: 0;
+  background-color: $color;
+  -webkit-mask-image: url('data:image/svg+xml;base64,#{map.get($sj-icons, $name)}');
+  mask-image: url('data:image/svg+xml;base64,#{map.get($sj-icons, $name)}');
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}

@@ -76,39 +76,31 @@
       </swiper>
     </view>
 
-    <!-- 第三层：最新活动专区 -->
-    <view class="section" v-if="latestList.length > 0">
-      <view class="section-header">
-        <text class="section-title">最新活动</text>
+    <!-- 第三层：最新活动专区（横向滑动大卡，机制上杜绝自动播放） -->
+    <view class="activity-section" v-if="latestCards.length > 0">
+      <view class="section-header activity-header">
+        <view class="section-title-wrap">
+          <view class="section-icon"></view>
+          <text class="section-title">最新活动</text>
+        </view>
+        <text class="section-more" @click="goCategory">全部 ›</text>
       </view>
-      <view class="vertical-list">
-        <view
-          class="vertical-card"
-          v-for="item in latestList"
-          :key="item.id"
-          @click="goDetail(item)"
-        >
-          <image
-            v-if="resolveImg(item.thumbnail_image || item.cover_image)"
-            class="vertical-thumb"
-            :src="resolveImg(item.thumbnail_image || item.cover_image)"
-            mode="aspectFill"
-          />
-          <view v-else class="vertical-thumb vertical-thumb-placeholder">
-            <text class="vertical-thumb-text">{{ placeholderChar(item.name) }}</text>
-          </view>
-          <view class="vertical-info">
-            <text class="vertical-name line-clamp-2">{{ item.name }}</text>
-            <view class="vertical-price">
-              <template v-if="item.promo_price > 0">
-                <text class="price-promo">¥{{ formatPrice(item.promo_price) }}</text>
-                <text class="price-original">¥{{ formatPrice(item.price) }}</text>
-              </template>
-              <text v-else class="price-current">¥{{ formatPrice(item.price) }}</text>
-            </view>
+      <!-- scroll-view 横向滚动：不用 swiper，从机制上不可能自动滚动 -->
+      <scroll-view class="activity-scroll" scroll-x="true" :show-scrollbar="false">
+        <view class="activity-track">
+          <view
+            class="activity-card"
+            v-for="card in latestCards"
+            :key="card.item.id"
+            @click="goDetail(card.item)"
+          >
+            <view class="activity-badge" v-if="card.hasPromo">限时特惠</view>
+            <text class="activity-name">{{ card.item.name }}</text>
+            <text class="activity-sub" v-if="card.subText">{{ card.subText }}</text>
+            <view class="activity-watermark"></view>
           </view>
         </view>
-      </view>
+      </scroll-view>
     </view>
 
     <!-- 第四层：热销专区 -->
@@ -243,6 +235,36 @@ const formatPrice = (val: any) => {
   return isNaN(n) ? '0.00' : n.toFixed(2);
 };
 
+// 省额展示：最多保留 2 位小数并去掉多余的 0（如 50 -> "50"，33.20 -> "33.2"）
+const formatAmount = (val: number) => {
+  return String(Math.round(val * 100) / 100);
+};
+
+// 副文案由真实价差派生（合规要求，禁止无依据的「立减 X」）：见 spec §15.3 四档规则
+const buildPromoText = (item: any): string => {
+  const price = Number(item.price) || 0;
+  const promo = Number(item.promo_price) || 0;
+  if (promo > 0 && price > 0) {
+    const saved = price - promo;
+    // Rule of 100：省额 ≥¥100 用绝对金额更直观，<¥100 用百分比避免「立减 ¥0.5」式低感知
+    return saved >= 100
+      ? `省 ¥${formatAmount(saved)}`
+      : `立减 ${Math.round((saved / price) * 100)}%`;
+  }
+  // 无促销价时退回服务简介首行；简介也为空则返回空串，模板据此不渲染该行
+  return String(item.description || '').trim();
+};
+
+// 活动卡最多 5 张（后端已限 5 条，前端 slice 为冗余兜底，双重防线）
+// 预计算副文案，避免模板里对同一项重复计算（性能优化）
+const latestCards = computed(() =>
+  latestList.value.slice(0, 5).map((item) => ({
+    item,
+    hasPromo: Number(item.promo_price) > 0,
+    subText: buildPromoText(item),
+  })),
+);
+
 const loadData = async () => {
   loading.value = true;
   try {
@@ -289,6 +311,7 @@ const goDetail = (item: any) => {
 
 <style lang="scss" scoped>
 @use '../../styles/variables.scss' as *;
+@use '../../styles/icons.scss' as *;
 .home {
   min-height: 100vh;
   background: $surface-page;
@@ -380,6 +403,111 @@ const goDetail = (item: any) => {
 .section-more {
   font-size: 26rpx;
   color: $text-secondary;
+}
+
+// 带图标的区块标题（lucide 图标 + 文案）
+.section-title-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.section-icon {
+  @include sj-icon('badge-percent', 32rpx, $color-primary);
+  margin-right: 10rpx;
+}
+
+// 最新活动：横滑大卡
+// 该板块不用 .section 左右留白，改为「标题留白 + 满宽滚动容器内边距」，
+// 让卡片能横向滚到页面边缘消失，而左侧仍与其它 .section 的 32rpx 栅格对齐
+.activity-section {
+  margin-top: 40rpx;
+}
+
+.activity-header {
+  // 覆盖 .section-header 默认的 margin-bottom，补齐左右 32rpx 栅格
+  margin: 0 32rpx 24rpx;
+}
+
+.activity-scroll {
+  width: 100%;
+  // 内边距实现左右留白，卡片可滚到边缘；满宽让下一张露出更多
+  padding: 0 32rpx;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+// H5 隐藏横向滚动条（原型 no-scrollbar）；微信端由 :show-scrollbar="false" 控制
+.activity-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.activity-track {
+  // 行内弹性轨道：宽度由内容撑开，从而在满宽容器内产生横向溢出
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.activity-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 440rpx;
+  height: 192rpx;
+  box-sizing: border-box;
+  padding: 20rpx 24rpx;
+  border-radius: 20rpx;
+  // 底色由现有令牌派生（白 → 浅沙），不新增色值
+  background: $gradient-card;
+  overflow: hidden;
+  margin-right: 20rpx;
+}
+
+.activity-badge {
+  align-self: flex-start;
+  flex-shrink: 0;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  line-height: 1.4;
+  font-weight: 700;
+  // 主色实底 + 白字，保证角标在浅色渐变上有足够对比
+  background: $color-primary;
+  color: $neutral-0;
+}
+
+.activity-name {
+  margin-top: 10rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1.3;
+  color: $text-primary;
+  // 服务名最多 2 行
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.activity-sub {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.3;
+  color: $text-secondary;
+  // 单行截断
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// 水印：固定 lucide sparkles，25% 透明度，纯装饰、不承载语义
+.activity-watermark {
+  position: absolute;
+  right: -8rpx;
+  bottom: -8rpx;
+  opacity: 0.25;
+  @include sj-icon('sparkles', 112rpx, $color-primary);
 }
 
 // 品类宫格 swiper 分页（每页8个，4列×2行）

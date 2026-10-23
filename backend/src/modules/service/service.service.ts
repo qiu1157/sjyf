@@ -270,6 +270,8 @@ export class ServiceService {
         'service_mode',
         'display_zone',
         'sort',
+        // US-046：无促销价时活动卡副文案需展示服务简介首行
+        'description',
       ],
       order: { sort: 'ASC', id: 'ASC' },
       take,
