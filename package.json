@@ -12,7 +12,11 @@
     "package:admin": "node code/scripts/package-release.cjs --admin-only",
     "package:miniapp": "node code/scripts/package-release.cjs --miniapp-only",
     "package:all": "node code/scripts/package-release.cjs",
-    "deploy:local": "node code/scripts/deploy-local.mjs"
+    "deploy:local": "node code/scripts/deploy-local.mjs",
+    "dev": "node code/scripts/dev-server.mjs start",
+    "dev:restart": "node code/scripts/dev-server.mjs restart",
+    "dev:stop": "node code/scripts/dev-server.mjs stop",
+    "dev:status": "node code/scripts/dev-server.mjs status"
   },
   "devDependencies": {
     "archiver": "^7.0.1",
